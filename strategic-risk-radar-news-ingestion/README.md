@@ -7,6 +7,21 @@ execution metrics, and continues when one source fails.
 GDELT is called once per keyword. `minimum_request_interval_seconds: 5.2`
 enforces more than five seconds between requests from the single worker.
 
+The configured keywords are intentionally high-signal operational phrases:
+
+- Conflict: `military escalation`
+- Cargo and maritime: `attack on commercial shipping`,
+  `shipping lane closure`, and `port closure`
+- Passenger operations: `airspace closure`
+- Migration and residency: `refugee influx`, `cross-border displacement`,
+  and `visa suspension`
+- Identity and border security: `travel document fraud` and
+  `migrant smuggling`
+
+Broad single words such as `displacement` are avoided because they generate
+large volumes of unrelated articles. Keyword performance should be reviewed
+using retrieved, matched, inserted, and duplicate metrics in Data Studio.
+
 Each source run stores its requested `window_start` and `window_end`. The next
 successful run resumes from the previous successful window end. Missing or
 stale state is clamped to `INGESTION_MAX_LOOKBACK_HOURS`. Defaults are a
@@ -20,7 +35,7 @@ Import `postman/GDELT-English-News.postman_collection.json` into Postman.
 
 - Send `Single Configurable Keyword` to test one keyword. Change the
   `keyword`, `lookbackHours`, or `maxrecords` collection variables as needed.
-- Run the `Project Keywords - Run With 6000 ms Delay` folder to test all five
+- Run the `Project Keywords - Run With 6000 ms Delay` folder to test all ten
   configured keywords.
 - In the Postman Collection Runner, set the request delay to at least `6000`
   milliseconds. GDELT may return HTTP `429` when requests are sent too quickly.
