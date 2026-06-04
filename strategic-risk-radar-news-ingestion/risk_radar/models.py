@@ -4,6 +4,17 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class KeywordSpec:
+    name: str
+    terms: tuple[str, ...]
+
+    @property
+    def gdelt_query(self) -> str:
+        phrases = " OR ".join(f'"{term}"' for term in self.terms)
+        return f"({phrases})"
+
+
+@dataclass(frozen=True)
 class RawItem:
     source_id: str
     source_type: str

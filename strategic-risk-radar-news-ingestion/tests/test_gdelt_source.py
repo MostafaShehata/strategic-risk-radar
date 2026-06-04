@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from risk_radar.models import TimeWindow
+from risk_radar.models import KeywordSpec, TimeWindow
 from risk_radar.sources import GdeltSource
 
 
@@ -22,7 +22,8 @@ def test_gdelt_keeps_only_english_articles():
             {"id": "gdelt", "url": "https://example.test", "retry_attempts": 1},
             client,
         )
-        results = list(source.fetch(("border closure",), TimeWindow(end - timedelta(hours=1), end)))
+        keyword = KeywordSpec("border disruption", ("border closure", "crossing closed"))
+        results = list(source.fetch((keyword,), TimeWindow(end - timedelta(hours=1), end)))
 
     assert len(results[0].items) == 1
     assert results[0].items[0].title == "Border closure announced"
@@ -44,7 +45,24 @@ def test_gdelt_keyword_failure_does_not_stop_remaining_keywords():
             {"id": "gdelt", "url": "https://example.test", "retry_attempts": 1},
             client,
         )
-        results = list(source.fetch(("first", "second"), TimeWindow(end - timedelta(hours=1), end)))
+        keywords = (KeywordSpec("first", ("first",)), KeywordSpec("second", ("second",)))
+        results = list(source.fetch(keywords, TimeWindow(end - timedelta(hours=1), end)))
 
     assert [result.keyword for result in results] == ["first", "second"]
     assert attempts == 2
+
+
+def test_gdelt_uses_or_query_for_keyword_group():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        assert "%22airspace+closure%22+OR+%22airport+closure%22" in url
+        return httpx.Response(200, json={"articles": []})
+
+    end = datetime.now(timezone.utc)
+    keyword = KeywordSpec("aviation disruption", ("airspace closure", "airport closure"))
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        source = GdeltSource(
+            {"id": "gdelt", "url": "https://example.test", "retry_attempts": 1},
+            client,
+        )
+        list(source.fetch((keyword,), TimeWindow(end - timedelta(hours=1), end)))

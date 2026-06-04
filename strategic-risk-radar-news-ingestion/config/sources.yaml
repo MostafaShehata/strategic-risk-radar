@@ -1,14 +1,34 @@
 keywords:
-  - military escalation
-  - attack on commercial shipping
-  - shipping lane closure
-  - port closure
-  - airspace closure
-  - refugee influx
-  - cross-border displacement
-  - visa suspension
-  - travel document fraud
-  - migrant smuggling
+  - name: conflict escalation
+    terms:
+      - military escalation
+      - conflict escalation
+      - hostilities intensify
+  - name: maritime and cargo disruption
+    terms:
+      - attack on commercial shipping
+      - vessel seized
+      - shipping lane closure
+      - port closure
+      - no safe transit
+  - name: aviation and passenger disruption
+    terms:
+      - airspace closure
+      - airport closure
+      - flight suspension
+      - mass flight cancellation
+  - name: migration and residency pressure
+    terms:
+      - refugee influx
+      - cross-border displacement
+      - mass arrival
+      - visa suspension
+  - name: identity and border crime
+    terms:
+      - travel document fraud
+      - fraudulent passport
+      - migrant smuggling
+      - human trafficking
 
 sources:
   - id: gdelt

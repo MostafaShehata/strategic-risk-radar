@@ -58,15 +58,15 @@ def run(
                 )
             except SourceSkipped as exc:
                 for keyword in settings.keywords:
-                    if keyword not in processed_keywords:
-                        store.save_keyword_metric(source_run_id, keyword, 0, 0, 0, 0)
+                    if keyword.name not in processed_keywords:
+                        store.save_keyword_metric(source_run_id, keyword.name, 0, 0, 0, 0)
                 store.finish_source(source_run_id, "skipped", totals,
                                     int((time.monotonic() - started) * 1000), str(exc))
                 print(f"{source_config['id']}: skipped: {exc}", flush=True)
             except Exception as exc:
                 for keyword in settings.keywords:
-                    if keyword not in processed_keywords:
-                        store.save_keyword_metric(source_run_id, keyword, 0, 0, 0, 0)
+                    if keyword.name not in processed_keywords:
+                        store.save_keyword_metric(source_run_id, keyword.name, 0, 0, 0, 0)
                 store.finish_source(source_run_id, "error", totals,
                                     int((time.monotonic() - started) * 1000), str(exc))
                 print(f"{source_config['id']}: {exc}")

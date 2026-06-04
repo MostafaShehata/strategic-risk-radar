@@ -6,7 +6,7 @@ from typing import Any
 import feedparser
 import httpx
 
-from .models import KeywordResult, RawItem, TimeWindow
+from .models import KeywordResult, KeywordSpec, RawItem, TimeWindow
 from .util import contains_keyword, parse_datetime, stable_id
 
 
@@ -39,16 +39,16 @@ class Source(ABC):
         raise RuntimeError("Request retry loop exited unexpectedly")
 
     @abstractmethod
-    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         raise NotImplementedError
 
 
 class GdeltSource(Source):
-    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         for keyword in keywords:
             try:
                 response = self.request("GET", self.config["url"], params={
-                    "query": f'"{keyword}" sourcelang:english',
+                    "query": f"{keyword.gdelt_query} sourcelang:english",
                     "mode": "artlist", "format": "json",
                     "maxrecords": self.config.get("max_records", 50),
                     "startdatetime": window.start.strftime("%Y%m%d%H%M%S"),
@@ -60,27 +60,27 @@ class GdeltSource(Source):
                     if article.get("language", "").casefold() == "english"
                 ]
             except (httpx.HTTPError, ValueError) as exc:
-                warning = f"Keyword '{keyword}' failed: {exc}"
+                warning = f"Keyword group '{keyword.name}' failed: {exc}"
                 print(f"gdelt {warning}", flush=True)
-                yield KeywordResult(keyword, 1, 0, (), warning)
+                yield KeywordResult(keyword.name, 1, 0, (), warning)
                 continue
             items = tuple(RawItem(
                 self.config["id"], "api", stable_id(a.get("url", ""), a.get("title", "")),
                 a.get("url", ""), a.get("title", ""), a.get("seendate", ""),
-                parse_datetime(a.get("seendate")), keyword, a,
+                parse_datetime(a.get("seendate")), keyword.name, a,
             ) for a in articles)
-            yield KeywordResult(keyword, 1, len(articles), items)
+            yield KeywordResult(keyword.name, 1, len(articles), items)
 
 
 class ReliefWebSource(Source):
-    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         if not self.config.get("appname"):
             raise SourceSkipped("RELIEFWEB_APPNAME is not configured")
         for keyword in keywords:
             response = self.request("POST", self.config["url"],
                 params={"appname": self.config["appname"]},
                 json={"limit": self.config.get("max_records", 50),
-                      "query": {"value": f'"{keyword}"'},
+                      "query": {"value": keyword.gdelt_query},
                       "filter": {"field": "date.created",
                                  "value": {"from": window.start.isoformat(),
                                            "to": window.end.isoformat()}},
@@ -97,13 +97,13 @@ class ReliefWebSource(Source):
                 items.append(RawItem(
                     self.config["id"], "api", str(record.get("id")),
                     fields.get("url", ""), title, body,
-                    parse_datetime(fields.get("date", {}).get("created")), keyword, record,
+                    parse_datetime(fields.get("date", {}).get("created")), keyword.name, record,
                 ))
-            yield KeywordResult(keyword, 1, len(records), tuple(items))
+            yield KeywordResult(keyword.name, 1, len(records), tuple(items))
 
 
 class RssSource(Source):
-    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         response = self.request("GET", self.config["url"])
         entries = []
         for entry in feedparser.parse(response.content).entries:
@@ -116,15 +116,17 @@ class RssSource(Source):
                 title, summary = entry.get("title", ""), entry.get("summary", "")
                 if not title.isascii() or not summary.isascii():
                     continue
-                if contains_keyword(f"{title} {summary}", keyword):
+                if any(contains_keyword(f"{title} {summary}", term) for term in keyword.terms):
                     url = entry.get("link", "")
                     items.append(RawItem(
                         self.config["id"], "rss", str(entry.get("id") or stable_id(url, title)),
                         url, title, summary,
                         parse_datetime(entry.get("published") or entry.get("updated")),
-                        keyword, dict(entry),
+                        keyword.name, dict(entry),
                     ))
-            yield KeywordResult(keyword, 1 if keyword == keywords[0] else 0, len(entries), tuple(items))
+            yield KeywordResult(
+                keyword.name, 1 if keyword == keywords[0] else 0, len(entries), tuple(items)
+            )
 
 
 SOURCE_TYPES = {"gdelt": GdeltSource, "reliefweb": ReliefWebSource, "rss": RssSource}

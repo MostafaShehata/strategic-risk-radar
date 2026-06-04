@@ -111,76 +111,41 @@
       ]
     },
     {
-      "name": "Project Keywords - Run With 6000 ms Delay",
+      "name": "Project Keyword Groups - Run With 6000 ms Delay",
       "item": [
         {
-          "name": "Military Escalation",
+          "name": "Conflict Escalation",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}?query=%22military%20escalation%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+            "url": "{{baseUrl}}?query=%28%22military%20escalation%22%20OR%20%22conflict%20escalation%22%20OR%20%22hostilities%20intensify%22%29%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
           }
         },
         {
-          "name": "Attack on Commercial Shipping",
+          "name": "Maritime and Cargo Disruption",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}?query=%22attack%20on%20commercial%20shipping%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+            "url": "{{baseUrl}}?query=%28%22attack%20on%20commercial%20shipping%22%20OR%20%22vessel%20seized%22%20OR%20%22shipping%20lane%20closure%22%20OR%20%22port%20closure%22%20OR%20%22no%20safe%20transit%22%29%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
           }
         },
         {
-          "name": "Shipping Lane Closure",
+          "name": "Aviation and Passenger Disruption",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}?query=%22shipping%20lane%20closure%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+            "url": "{{baseUrl}}?query=%28%22airspace%20closure%22%20OR%20%22airport%20closure%22%20OR%20%22flight%20suspension%22%20OR%20%22mass%20flight%20cancellation%22%29%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
           }
         },
         {
-          "name": "Port Closure",
+          "name": "Migration and Residency Pressure",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}?query=%22port%20closure%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+            "url": "{{baseUrl}}?query=%28%22refugee%20influx%22%20OR%20%22cross-border%20displacement%22%20OR%20%22mass%20arrival%22%20OR%20%22visa%20suspension%22%29%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
           }
         },
         {
-          "name": "Airspace Closure",
+          "name": "Identity and Border Crime",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}?query=%22airspace%20closure%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
-          }
-        },
-        {
-          "name": "Refugee Influx",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}?query=%22refugee%20influx%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
-          }
-        },
-        {
-          "name": "Cross-Border Displacement",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}?query=%22cross-border%20displacement%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
-          }
-        },
-        {
-          "name": "Visa Suspension",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}?query=%22visa%20suspension%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
-          }
-        },
-        {
-          "name": "Travel Document Fraud",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}?query=%22travel%20document%20fraud%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
-          }
-        },
-        {
-          "name": "Migrant Smuggling",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}?query=%22migrant%20smuggling%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+            "url": "{{baseUrl}}?query=%28%22travel%20document%20fraud%22%20OR%20%22fraudulent%20passport%22%20OR%20%22migrant%20smuggling%22%20OR%20%22human%20trafficking%22%29%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
           }
         }
       ],
