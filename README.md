@@ -77,4 +77,8 @@ successful window, so they can be retried.
 Each project has its own `build.ps1`, `deploy.ps1`, `build.sh`, and `deploy.sh`.
 The root `bin` directory builds, tests, deploys, and stops the complete stack.
 
+Runtime containers use explicit names without Docker Compose numeric suffixes.
+News ingestion is a one-shot process: its container remains visible in an
+exited state after completion so operators can inspect its logs and exit code.
+
 See [TRACE.md](TRACE.md) for the detailed execution trace.

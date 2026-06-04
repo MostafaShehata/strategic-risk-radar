@@ -1,5 +1,6 @@
 services:
   db:
+    container_name: strategic-risk-radar-db
     build: ./strategic-risk-radar-db
     image: strategic-risk-radar-db:local
     environment:
@@ -26,6 +27,7 @@ services:
         condition: service_healthy
 
   news-ingestion:
+    container_name: strategic-risk-radar-news-ingestion
     build: ./strategic-risk-radar-news-ingestion
     image: strategic-risk-radar-news-ingestion:local
     environment:
@@ -37,6 +39,7 @@ services:
     restart: "no"
 
   data-studio-backend:
+    container_name: strategic-risk-radar-data-studio-backend
     build: ./strategic-risk-radar-data-studio-backend
     image: strategic-risk-radar-data-studio-backend:local
     environment:
@@ -48,6 +51,7 @@ services:
         condition: service_healthy
 
   data-studio-frontend:
+    container_name: strategic-risk-radar-data-studio-frontend
     build: ./strategic-risk-radar-data-studio-frontend
     image: strategic-risk-radar-data-studio-frontend:local
     ports:
