@@ -1,5 +1,5 @@
 [project]
-name = "strategic-risk-radar-ingestion"
+name = "strategic-risk-radar-news-ingestion"
 version = "0.2.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -24,4 +24,3 @@ include = ["risk_radar*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-

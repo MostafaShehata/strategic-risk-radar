@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS source_runs (
     run_id UUID NOT NULL REFERENCES ingestion_runs(id),
     source_id TEXT NOT NULL,
     source_type TEXT NOT NULL,
+    window_start TIMESTAMPTZ NOT NULL,
+    window_end TIMESTAMPTZ NOT NULL,
     started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     completed_at TIMESTAMPTZ,
     status TEXT NOT NULL DEFAULT 'running',
@@ -29,6 +31,12 @@ CREATE TABLE IF NOT EXISTS source_runs (
     duration_ms INTEGER,
     error_message TEXT
 );
+
+ALTER TABLE source_runs ADD COLUMN IF NOT EXISTS window_start TIMESTAMPTZ;
+ALTER TABLE source_runs ADD COLUMN IF NOT EXISTS window_end TIMESTAMPTZ;
+UPDATE source_runs SET window_start = coalesce(window_start, started_at - interval '24 hours'),
+                       window_end = coalesce(window_end, started_at)
+WHERE window_start IS NULL OR window_end IS NULL;
 
 CREATE TABLE IF NOT EXISTS keyword_run_metrics (
     source_run_id BIGINT NOT NULL REFERENCES source_runs(id),
@@ -74,6 +82,8 @@ CREATE TABLE IF NOT EXISTS run_item_observations (
 );
 
 CREATE INDEX IF NOT EXISTS source_runs_run_idx ON source_runs(run_id);
+CREATE INDEX IF NOT EXISTS source_runs_latest_success_idx
+ON source_runs(source_id, window_end DESC) WHERE status = 'completed';
 CREATE INDEX IF NOT EXISTS raw_news_pending_idx ON raw_news_items(processing_status, first_seen_at);
 CREATE INDEX IF NOT EXISTS observations_run_idx ON run_item_observations(run_id);
 
@@ -90,4 +100,3 @@ SELECT n.id, n.source_id, n.title, n.url, n.summary, n.published_at,
 FROM raw_news_items n
 LEFT JOIN raw_news_item_keywords k ON k.item_id = n.id
 GROUP BY n.id;
-

@@ -1,32 +1,33 @@
 # Strategic Risk Radar
 
 Containerized public-information ingestion PoC for strategic early warning.
-The repository contains three independently buildable projects:
+The repository contains four independently buildable projects:
 
 | Project | Responsibility |
 |---|---|
-| `strategic-risk-radar-python` | Retrieve API/RSS data and record run metrics |
+| `strategic-risk-radar-news-ingestion` | Retrieve API/RSS data and record run metrics |
 | `strategic-risk-radar-db` | PostgreSQL image, schema, views, and raw evidence |
-| `strategic-risk-radar-data-studio` | Metabase browser and dashboard interface |
+| `strategic-risk-radar-data-studio-backend` | Read-only FastAPI query service |
+| `strategic-risk-radar-data-studio-frontend` | Custom Angular dashboard |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    G["GDELT API<br/>5.2s request interval"] --> P["Python ingestion worker"]
+    G["GDELT API<br/>5.2s request interval"] --> P["News ingestion worker"]
     R["ReliefWeb API"] --> P
     U["UN News RSS"] --> P
     D["GDACS RSS"] --> P
     P -->|"raw documents + observations + metrics"| DB["PostgreSQL"]
-    DB --> V["Database views"]
-    V --> M["Metabase Data Studio<br/>localhost:3000"]
+    DB --> B["FastAPI Data Studio backend<br/>localhost:8000"]
+    B --> A["Angular Data Studio<br/>localhost:3000"]
     DB --> N["Future filtering and<br/>deduplication agent"]
 ```
 
 ## Data Model
 
 - `ingestion_runs`: one row for every complete ingestion execution.
-- `source_runs`: status, requests, counts, duration, and error for each source.
+- `source_runs`: status, requested date window, counts, duration, and error.
 - `keyword_run_metrics`: documents retrieved, matched, inserted, and duplicated
   for every source and keyword.
 - `raw_news_items`: immutable first-seen raw documents.
@@ -49,21 +50,13 @@ Copy-Item .env.example .env
 .\bin\deploy-all.ps1
 ```
 
-Open `http://localhost:3000`, complete Metabase setup, then add PostgreSQL:
-
-```text
-Host: db
-Port: 5432
-Database: risk_radar
-Username: risk_radar
-Password: value from .env
-```
+Open `http://localhost:3000` to use the Angular Data Studio. The read-only API
+and interactive documentation are available at `http://localhost:8000/docs`.
 
 PostgreSQL is also exposed to the host on `localhost:5434` for tools such as
 pgAdmin. Containers use the internal address `db:5432`.
 
-Browse `v_documents_browse` to inspect the data itself. Use `v_run_summary`,
-`source_runs`, and `keyword_run_metrics` for operational dashboards.
+The UI provides document browsing and run, source-window, and keyword views.
 
 ## GDELT Limit
 
@@ -71,6 +64,13 @@ GDELT receives one request per keyword. The worker enforces a configurable
 minimum interval of `5.2` seconds before every subsequent GDELT request. The
 deployment intentionally runs one ingestion worker, preventing concurrent
 workers from violating the limit.
+
+## Incremental Date Windows
+
+Each source resumes from the end of its latest successful source run. If no
+successful run exists, or that date is older than 24 hours, ingestion retrieves
+only the most recent 24 hours. Failed source windows do not advance the latest
+successful window, so they can be retried.
 
 ## Project Scripts
 

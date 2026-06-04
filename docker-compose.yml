@@ -16,9 +16,18 @@ services:
       timeout: 5s
       retries: 20
 
-  ingestion:
-    build: ./strategic-risk-radar-python
-    image: strategic-risk-radar-python:local
+  db-migrate:
+    image: strategic-risk-radar-db:local
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-risk_radar}
+    command: ["psql", "-h", "db", "-U", "${POSTGRES_USER:-risk_radar}", "-d", "${POSTGRES_DB:-risk_radar}", "-f", "/docker-entrypoint-initdb.d/001-init.sql"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  news-ingestion:
+    build: ./strategic-risk-radar-news-ingestion
+    image: strategic-risk-radar-news-ingestion:local
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
       RELIEFWEB_APPNAME: ${RELIEFWEB_APPNAME:-}
@@ -27,19 +36,24 @@ services:
         condition: service_healthy
     restart: "no"
 
-  data-studio:
-    build: ./strategic-risk-radar-data-studio
-    image: strategic-risk-radar-data-studio:local
+  data-studio-backend:
+    build: ./strategic-risk-radar-data-studio-backend
+    image: strategic-risk-radar-data-studio-backend:local
     environment:
-      MB_DB_FILE: /metabase-data/metabase.db
+      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
     ports:
-      - "${METABASE_PORT:-3000}:3000"
-    volumes:
-      - risk-radar-metabase:/metabase-data
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
 
+  data-studio-frontend:
+    build: ./strategic-risk-radar-data-studio-frontend
+    image: strategic-risk-radar-data-studio-frontend:local
+    ports:
+      - "${DATA_STUDIO_PORT:-3000}:80"
+    depends_on:
+      - data-studio-backend
+
 volumes:
   risk-radar-db:
-  risk-radar-metabase:

@@ -23,14 +23,16 @@ This trace follows one invocation of the ingestion container.
 2. PostgreSQL generates the run UUID.
 3. The run begins with status `running`.
 
-## 4. Source Execution
+## 4. Source Execution And Date Window
 
 For every configured source:
 
-1. `Store.begin_source()` creates a `source_runs` row.
-2. `build_source()` selects the GDELT, ReliefWeb, or RSS adapter.
-3. The adapter returns one `KeywordResult` per configured keyword.
-4. Every `KeywordResult` records request count, retrieved count, and matching
+1. `Store.next_window()` reads the latest successful source window.
+2. The start time is clamped to no earlier than 24 hours before now.
+3. `Store.begin_source()` saves the requested start/end times.
+4. `build_source()` selects the GDELT, ReliefWeb, or RSS adapter.
+5. The adapter returns one `KeywordResult` per configured keyword.
+6. Every `KeywordResult` records request count, retrieved count, and matching
    raw items.
 
 ### GDELT
@@ -44,8 +46,9 @@ For every configured source:
 ### RSS
 
 1. Each RSS feed is downloaded once.
-2. The entries are checked locally against every keyword.
-3. Only the first keyword metric records the network request; every keyword
+2. Entries outside the requested date window are discarded.
+3. Remaining entries are checked locally against every keyword.
+4. Only the first keyword metric records the network request; every keyword
    metric records how many feed entries were inspected and matched.
 
 ## 5. Document Persistence
@@ -68,8 +71,6 @@ For each matching document:
 
 ## 7. Browsing
 
-1. Metabase connects directly to PostgreSQL on the Compose network.
-2. `v_documents_browse` exposes readable document fields and keywords.
-3. `v_run_summary` exposes high-level run outcomes.
-4. Detailed dashboards can use `source_runs` and `keyword_run_metrics`.
-
+1. The FastAPI backend reads PostgreSQL through read-only endpoints.
+2. The Angular frontend calls the backend through the Nginx `/api` proxy.
+3. Users browse documents and inspect runs, source windows, and keywords.

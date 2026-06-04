@@ -1,10 +1,11 @@
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
 import psycopg
 
-from .models import RawItem
+from .models import RawItem, TimeWindow
 
 
 class Store:
@@ -18,11 +19,25 @@ class Store:
                 (json.dumps(config),),
             ).fetchone()[0]
 
-    def begin_source(self, run_id: UUID, source_id: str, source_type: str) -> int:
+    def next_window(self, source_id: str, now: datetime | None = None) -> TimeWindow:
+        end = now or datetime.now(timezone.utc)
+        earliest = end - timedelta(hours=24)
+        with psycopg.connect(self.database_url) as connection:
+            row = connection.execute(
+                """SELECT max(window_end) FROM source_runs
+                   WHERE source_id=%s AND status='completed' AND window_end IS NOT NULL""",
+                (source_id,),
+            ).fetchone()
+        last_end = row[0] if row else None
+        start = max(last_end, earliest) if last_end else earliest
+        return TimeWindow(start=min(start, end), end=end)
+
+    def begin_source(self, run_id: UUID, source_id: str, source_type: str, window: TimeWindow) -> int:
         with psycopg.connect(self.database_url) as connection:
             return connection.execute(
-                "INSERT INTO source_runs(run_id, source_id, source_type) VALUES (%s,%s,%s) RETURNING id",
-                (run_id, source_id, source_type),
+                """INSERT INTO source_runs(run_id, source_id, source_type, window_start, window_end)
+                   VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                (run_id, source_id, source_type, window.start, window.end),
             ).fetchone()[0]
 
     def save_item(self, run_id: UUID, source_run_id: int, item: RawItem) -> bool:
@@ -87,4 +102,3 @@ class Store:
                    WHERE r.id=x.run_id""",
                 (run_id,),
             )
-

@@ -1,5 +1,7 @@
 import httpx
+from datetime import datetime, timedelta, timezone
 
+from risk_radar.models import TimeWindow
 from risk_radar.sources import GdeltSource
 
 
@@ -17,6 +19,7 @@ def test_gdelt_waits_between_keyword_requests(monkeypatch):
             "id": "gdelt", "url": "https://example.test",
             "minimum_request_interval_seconds": 5.2, "retry_attempts": 1,
         }, client)
-        list(source.fetch(("first", "second")))
+        end = datetime.now(timezone.utc)
+        list(source.fetch(("first", "second"), TimeWindow(end - timedelta(hours=1), end)))
 
     assert sleeps == [5.2]

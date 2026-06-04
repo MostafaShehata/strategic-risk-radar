@@ -6,7 +6,7 @@ from typing import Any
 import feedparser
 import httpx
 
-from .models import KeywordResult, RawItem
+from .models import KeywordResult, RawItem, TimeWindow
 from .util import contains_keyword, parse_datetime, stable_id
 
 
@@ -35,17 +35,19 @@ class Source(ABC):
         raise RuntimeError("Request retry loop exited unexpectedly")
 
     @abstractmethod
-    def fetch(self, keywords: tuple[str, ...]) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         raise NotImplementedError
 
 
 class GdeltSource(Source):
-    def fetch(self, keywords: tuple[str, ...]) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         for keyword in keywords:
             response = self.request("GET", self.config["url"], params={
                 "query": f'"{keyword}"', "mode": "artlist", "format": "json",
                 "maxrecords": self.config.get("max_records", 50),
-                "timespan": self.config.get("lookback", "24h"), "sort": "datedesc",
+                "startdatetime": window.start.strftime("%Y%m%d%H%M%S"),
+                "enddatetime": window.end.strftime("%Y%m%d%H%M%S"),
+                "sort": "datedesc",
             })
             articles = response.json().get("articles", [])
             items = tuple(RawItem(
@@ -57,7 +59,7 @@ class GdeltSource(Source):
 
 
 class ReliefWebSource(Source):
-    def fetch(self, keywords: tuple[str, ...]) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         if not self.config.get("appname"):
             raise ValueError("RELIEFWEB_APPNAME must be set for ReliefWeb")
         for keyword in keywords:
@@ -65,6 +67,9 @@ class ReliefWebSource(Source):
                 params={"appname": self.config["appname"]},
                 json={"limit": self.config.get("max_records", 50),
                       "query": {"value": f'"{keyword}"'},
+                      "filter": {"field": "date.created",
+                                 "value": {"from": window.start.isoformat(),
+                                           "to": window.end.isoformat()}},
                       "sort": ["date.created:desc"],
                       "fields": {"include": ["title", "url", "body", "date.created"]}})
             records = response.json().get("data", [])
@@ -80,9 +85,13 @@ class ReliefWebSource(Source):
 
 
 class RssSource(Source):
-    def fetch(self, keywords: tuple[str, ...]) -> Iterable[KeywordResult]:
+    def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         response = self.request("GET", self.config["url"])
-        entries = feedparser.parse(response.content).entries
+        entries = []
+        for entry in feedparser.parse(response.content).entries:
+            published_at = parse_datetime(entry.get("published") or entry.get("updated"))
+            if published_at and window.start <= published_at <= window.end:
+                entries.append(entry)
         for keyword in keywords:
             items = []
             for entry in entries:

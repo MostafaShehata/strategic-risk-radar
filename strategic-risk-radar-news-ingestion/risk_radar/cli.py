@@ -16,12 +16,15 @@ def run(config_path: str, database_url: str) -> None:
     with httpx.Client(timeout=45, follow_redirects=True,
                       headers={"User-Agent": "Strategic-Risk-Radar-PoC/0.2"}) as client:
         for source_config in settings.sources:
-            source_run_id = store.begin_source(run_id, source_config["id"], source_config["type"])
+            window = store.next_window(source_config["id"])
+            source_run_id = store.begin_source(
+                run_id, source_config["id"], source_config["type"], window
+            )
             started = time.monotonic()
             processed_keywords = set()
             totals = {"requests": 0, "retrieved": 0, "matched": 0, "inserted": 0, "duplicates": 0}
             try:
-                for result in build_source(source_config, client).fetch(settings.keywords):
+                for result in build_source(source_config, client).fetch(settings.keywords, window):
                     inserted = sum(store.save_item(run_id, source_run_id, item) for item in result.items)
                     store.save_keyword_metric(source_run_id, result.keyword, result.request_count,
                                               result.retrieved_count, len(result.items), inserted)

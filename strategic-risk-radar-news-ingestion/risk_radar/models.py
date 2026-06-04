@@ -24,3 +24,8 @@ class KeywordResult:
     retrieved_count: int
     items: tuple[RawItem, ...]
 
+
+@dataclass(frozen=True)
+class TimeWindow:
+    start: datetime
+    end: datetime
