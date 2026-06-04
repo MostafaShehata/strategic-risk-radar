@@ -7,7 +7,8 @@ This trace follows one invocation of the ingestion container.
 1. Docker Compose waits until the database health check succeeds.
 2. The ingestion image starts with `ingest-news --config config/sources.yaml`.
 3. The console entry point maps to `risk_radar.cli:main`.
-4. `main()` reads `DATABASE_URL` and calls `run()`.
+4. `main()` reads the scheduler interval and maximum lookback configuration.
+5. One cycle runs immediately, then the process sleeps until the next interval.
 
 ## 2. Configuration
 
@@ -28,7 +29,8 @@ This trace follows one invocation of the ingestion container.
 For every configured source:
 
 1. `Store.next_window()` reads the latest successful source window.
-2. The start time is clamped to no earlier than 24 hours before now.
+2. The start time is clamped to no earlier than the configured maximum
+   lookback, defaulting to two hours before now.
 3. `Store.begin_source()` saves the requested start/end times.
 4. `build_source()` selects the GDELT, ReliefWeb, or RSS adapter.
 5. The adapter returns one `KeywordResult` per configured keyword.

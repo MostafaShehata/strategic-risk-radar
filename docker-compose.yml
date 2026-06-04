@@ -33,10 +33,12 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
       RELIEFWEB_APPNAME: ${RELIEFWEB_APPNAME:-}
+      INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-30}
+      INGESTION_MAX_LOOKBACK_HOURS: ${INGESTION_MAX_LOOKBACK_HOURS:-2}
     depends_on:
       db:
         condition: service_healthy
-    restart: "no"
+    restart: unless-stopped
 
   data-studio-backend:
     container_name: strategic-risk-radar-data-studio-backend

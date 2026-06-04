@@ -67,10 +67,12 @@ workers from violating the limit.
 
 ## Incremental Date Windows
 
-Each source resumes from the end of its latest successful source run. If no
-successful run exists, or that date is older than 24 hours, ingestion retrieves
-only the most recent 24 hours. Failed source windows do not advance the latest
-successful window, so they can be retried.
+News ingestion runs continuously every `INGESTION_INTERVAL_MINUTES` minutes,
+defaulting to `30`. Each source resumes from the end of its latest successful
+source run. If no successful run exists, or that date is older than
+`INGESTION_MAX_LOOKBACK_HOURS`, ingestion retrieves only that configured
+lookback period, defaulting to `2` hours. Failed source windows do not advance
+the latest successful window, so they can be retried.
 
 ## Project Scripts
 
@@ -78,7 +80,7 @@ Each project has its own `build.ps1`, `deploy.ps1`, `build.sh`, and `deploy.sh`.
 The root `bin` directory builds, tests, deploys, and stops the complete stack.
 
 Runtime containers use explicit names without Docker Compose numeric suffixes.
-News ingestion is a one-shot process: its container remains visible in an
-exited state after completion so operators can inspect its logs and exit code.
+News ingestion remains running as a scheduler container and records a separate
+database run for every scheduled cycle.
 
 See [TRACE.md](TRACE.md) for the detailed execution trace.

@@ -8,6 +8,16 @@ import psycopg
 from .models import RawItem, TimeWindow
 
 
+def calculate_window(
+    end: datetime,
+    last_successful_end: datetime | None,
+    max_lookback_hours: float,
+) -> TimeWindow:
+    earliest = end - timedelta(hours=max_lookback_hours)
+    start = max(last_successful_end, earliest) if last_successful_end else earliest
+    return TimeWindow(start=min(start, end), end=end)
+
+
 class Store:
     def __init__(self, database_url: str):
         self.database_url = database_url
@@ -19,9 +29,13 @@ class Store:
                 (json.dumps(config),),
             ).fetchone()[0]
 
-    def next_window(self, source_id: str, now: datetime | None = None) -> TimeWindow:
+    def next_window(
+        self,
+        source_id: str,
+        max_lookback_hours: float,
+        now: datetime | None = None,
+    ) -> TimeWindow:
         end = now or datetime.now(timezone.utc)
-        earliest = end - timedelta(hours=24)
         with psycopg.connect(self.database_url) as connection:
             row = connection.execute(
                 """SELECT max(window_end) FROM source_runs
@@ -29,8 +43,7 @@ class Store:
                 (source_id,),
             ).fetchone()
         last_end = row[0] if row else None
-        start = max(last_end, earliest) if last_end else earliest
-        return TimeWindow(start=min(start, end), end=end)
+        return calculate_window(end, last_end, max_lookback_hours)
 
     def begin_source(self, run_id: UUID, source_id: str, source_type: str, window: TimeWindow) -> int:
         with psycopg.connect(self.database_url) as connection:
