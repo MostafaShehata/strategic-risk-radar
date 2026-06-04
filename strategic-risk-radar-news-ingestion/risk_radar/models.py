@@ -23,6 +23,7 @@ class KeywordResult:
     request_count: int
     retrieved_count: int
     items: tuple[RawItem, ...]
+    warning: str | None = None
 
 
 @dataclass(frozen=True)

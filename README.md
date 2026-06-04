@@ -73,8 +73,11 @@ News ingestion runs continuously every `INGESTION_INTERVAL_MINUTES` minutes,
 defaulting to `30`. Each source resumes from the end of its latest successful
 source run. If no successful run exists, or that date is older than
 `INGESTION_MAX_LOOKBACK_HOURS`, ingestion retrieves only that configured
-lookback period, defaulting to `2` hours. Failed source windows do not advance
+lookback period, currently defaulting to `24` hours for source testing. Failed source windows do not advance
 the latest successful window, so they can be retried.
+
+Only English news is persisted. GDELT requests explicitly select English
+sources, and the selected RSS feeds are English feeds.
 
 ## Project Scripts
 

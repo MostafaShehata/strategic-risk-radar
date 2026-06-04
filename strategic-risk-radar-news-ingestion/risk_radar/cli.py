@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import httpx
 
 from .config import load_settings
-from .sources import build_source
+from .sources import SourceSkipped, build_source
 from .storage import Store
 
 
@@ -35,6 +35,7 @@ def run(
             )
             started = time.monotonic()
             processed_keywords = set()
+            warnings = []
             totals = {"requests": 0, "retrieved": 0, "matched": 0, "inserted": 0, "duplicates": 0}
             try:
                 for result in build_source(source_config, client).fetch(settings.keywords, window):
@@ -48,7 +49,20 @@ def run(
                     totals["inserted"] += inserted
                     totals["duplicates"] += len(result.items) - inserted
                     processed_keywords.add(result.keyword)
-                store.finish_source(source_run_id, "completed", totals, int((time.monotonic() - started) * 1000))
+                    if result.warning:
+                        warnings.append(result.warning)
+                store.finish_source(
+                    source_run_id, "completed", totals,
+                    int((time.monotonic() - started) * 1000),
+                    "\n".join(warnings) or None,
+                )
+            except SourceSkipped as exc:
+                for keyword in settings.keywords:
+                    if keyword not in processed_keywords:
+                        store.save_keyword_metric(source_run_id, keyword, 0, 0, 0, 0)
+                store.finish_source(source_run_id, "skipped", totals,
+                                    int((time.monotonic() - started) * 1000), str(exc))
+                print(f"{source_config['id']}: skipped: {exc}", flush=True)
             except Exception as exc:
                 for keyword in settings.keywords:
                     if keyword not in processed_keywords:
@@ -90,7 +104,7 @@ def main() -> None:
     args = parser.parse_args()
     database_url = os.environ["DATABASE_URL"]
     interval_minutes = float(os.getenv("INGESTION_INTERVAL_MINUTES", "30"))
-    max_lookback_hours = float(os.getenv("INGESTION_MAX_LOOKBACK_HOURS", "2"))
+    max_lookback_hours = float(os.getenv("INGESTION_MAX_LOOKBACK_HOURS", "24"))
     if interval_minutes <= 0:
         raise ValueError("INGESTION_INTERVAL_MINUTES must be greater than zero")
     if max_lookback_hours <= 0:

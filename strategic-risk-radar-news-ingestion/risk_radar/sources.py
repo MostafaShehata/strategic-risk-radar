@@ -10,6 +10,10 @@ from .models import KeywordResult, RawItem, TimeWindow
 from .util import contains_keyword, parse_datetime, stable_id
 
 
+class SourceSkipped(Exception):
+    """Raised when a configured source cannot run without optional configuration."""
+
+
 class Source(ABC):
     def __init__(self, config: dict[str, Any], client: httpx.Client):
         self.config = config
@@ -42,14 +46,24 @@ class Source(ABC):
 class GdeltSource(Source):
     def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         for keyword in keywords:
-            response = self.request("GET", self.config["url"], params={
-                "query": f'"{keyword}"', "mode": "artlist", "format": "json",
-                "maxrecords": self.config.get("max_records", 50),
-                "startdatetime": window.start.strftime("%Y%m%d%H%M%S"),
-                "enddatetime": window.end.strftime("%Y%m%d%H%M%S"),
-                "sort": "datedesc",
-            })
-            articles = response.json().get("articles", [])
+            try:
+                response = self.request("GET", self.config["url"], params={
+                    "query": f'"{keyword}" sourcelang:english',
+                    "mode": "artlist", "format": "json",
+                    "maxrecords": self.config.get("max_records", 50),
+                    "startdatetime": window.start.strftime("%Y%m%d%H%M%S"),
+                    "enddatetime": window.end.strftime("%Y%m%d%H%M%S"),
+                    "sort": "datedesc",
+                })
+                articles = [
+                    article for article in response.json().get("articles", [])
+                    if article.get("language", "").casefold() == "english"
+                ]
+            except (httpx.HTTPError, ValueError) as exc:
+                warning = f"Keyword '{keyword}' failed: {exc}"
+                print(f"gdelt {warning}", flush=True)
+                yield KeywordResult(keyword, 1, 0, (), warning)
+                continue
             items = tuple(RawItem(
                 self.config["id"], "api", stable_id(a.get("url", ""), a.get("title", "")),
                 a.get("url", ""), a.get("title", ""), a.get("seendate", ""),
@@ -61,7 +75,7 @@ class GdeltSource(Source):
 class ReliefWebSource(Source):
     def fetch(self, keywords: tuple[str, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         if not self.config.get("appname"):
-            raise ValueError("RELIEFWEB_APPNAME must be set for ReliefWeb")
+            raise SourceSkipped("RELIEFWEB_APPNAME is not configured")
         for keyword in keywords:
             response = self.request("POST", self.config["url"],
                 params={"appname": self.config["appname"]},
@@ -76,9 +90,13 @@ class ReliefWebSource(Source):
             items = []
             for record in records:
                 fields = record.get("fields", {})
+                title = fields.get("title", "")
+                body = fields.get("body", "")
+                if not title.isascii() or not body.isascii():
+                    continue
                 items.append(RawItem(
                     self.config["id"], "api", str(record.get("id")),
-                    fields.get("url", ""), fields.get("title", ""), fields.get("body", ""),
+                    fields.get("url", ""), title, body,
                     parse_datetime(fields.get("date", {}).get("created")), keyword, record,
                 ))
             yield KeywordResult(keyword, 1, len(records), tuple(items))
@@ -96,6 +114,8 @@ class RssSource(Source):
             items = []
             for entry in entries:
                 title, summary = entry.get("title", ""), entry.get("summary", "")
+                if not title.isascii() or not summary.isascii():
+                    continue
                 if contains_keyword(f"{title} {summary}", keyword):
                     url = entry.get("link", "")
                     items.append(RawItem(

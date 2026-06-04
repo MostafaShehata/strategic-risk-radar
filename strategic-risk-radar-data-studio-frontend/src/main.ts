@@ -54,13 +54,15 @@ import { bootstrapApplication } from '@angular/platform-browser';
               <span class="badge" [class.bad]="source.status==='error'">{{source.status}}</span>
             </div>
             <div class="source-stats">
-              <span><b>{{source.request_count}}</b> requests</span><span><b>{{source.retrieved_count}}</b> retrieved</span>
+              <span><b>{{source.request_count}}</b> source HTTP requests</span><span><b>{{source.retrieved_count}}</b> entries retrieved</span>
               <span><b>{{source.matched_count}}</b> matched</span><span><b>{{source.inserted_count}}</b> inserted</span>
               <span><b>{{source.duplicate_count}}</b> duplicates</span><span><b>{{source.duration_ms}} ms</b> duration</span>
             </div>
-            <p class="error" *ngIf="source.error_message">{{source.error_message}}</p>
-            <table class="keyword-table"><thead><tr><th>Keyword</th><th>Requests</th><th>Retrieved</th><th>Matched</th><th>Inserted</th><th>Duplicates</th></tr></thead>
-              <tbody><tr *ngFor="let keyword of source.keywords"><td><strong>{{keyword.keyword}}</strong></td><td>{{keyword.request_count}}</td><td>{{keyword.retrieved_count}}</td><td>{{keyword.matched_count}}</td><td>{{keyword.inserted_count}}</td><td>{{keyword.duplicate_count}}</td></tr></tbody>
+            <p class="info" *ngIf="source.source_type==='rss'">RSS is downloaded once per source run, then every keyword is evaluated locally against the same English feed entries.</p>
+            <p class="error" *ngIf="source.error_message && source.status!=='skipped'"><strong>Source warnings:</strong><br>{{source.error_message}}</p>
+            <p class="info" *ngIf="source.status==='skipped'">{{source.error_message}}</p>
+            <table class="keyword-table"><thead><tr><th>Keyword evaluated</th><th>Entries inspected</th><th>Matched</th><th>Inserted</th><th>Duplicates</th></tr></thead>
+              <tbody><tr *ngFor="let keyword of source.keywords"><td><strong>{{keyword.keyword}}</strong></td><td>{{keyword.retrieved_count}}</td><td>{{keyword.matched_count}}</td><td>{{keyword.inserted_count}}</td><td>{{keyword.duplicate_count}}</td></tr></tbody>
             </table>
           </article>
         </section>

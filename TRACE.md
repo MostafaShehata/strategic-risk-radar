@@ -30,7 +30,7 @@ For every configured source:
 
 1. `Store.next_window()` reads the latest successful source window.
 2. The start time is clamped to no earlier than the configured maximum
-   lookback, defaulting to two hours before now.
+   lookback, currently defaulting to 24 hours before now for source testing.
 3. `Store.begin_source()` saves the requested start/end times.
 4. `build_source()` selects the GDELT, ReliefWeb, or RSS adapter.
 5. The adapter returns one `KeywordResult` per configured keyword.
