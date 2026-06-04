@@ -13,3 +13,17 @@ stale state is clamped to `INGESTION_MAX_LOOKBACK_HOURS`. Defaults are a
 30-minute schedule and a 24-hour maximum lookback for source testing.
 
 Use `ingest-news --once` to execute one cycle without starting the scheduler.
+
+## Test GDELT With Postman
+
+Import `postman/GDELT-English-News.postman_collection.json` into Postman.
+
+- Send `Single Configurable Keyword` to test one keyword. Change the
+  `keyword`, `lookbackHours`, or `maxrecords` collection variables as needed.
+- Run the `Project Keywords - Run With 6000 ms Delay` folder to test all five
+  configured keywords.
+- In the Postman Collection Runner, set the request delay to at least `6000`
+  milliseconds. GDELT may return HTTP `429` when requests are sent too quickly.
+
+The collection automatically calculates the latest UTC date range and verifies
+that successful responses contain an `articles` array with English results.

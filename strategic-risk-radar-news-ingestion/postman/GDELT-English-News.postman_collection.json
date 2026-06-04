@@ -1,0 +1,170 @@
+{
+  "info": {
+    "_postman_id": "839d48d1-2512-45a0-a6e8-ea94001f5246",
+    "name": "Strategic Risk Radar - GDELT English News",
+    "description": "Tests the GDELT DOC 2.0 API used by Strategic Risk Radar. The collection automatically searches the latest 24-hour UTC window and restricts results to English sources. When running multiple requests, configure a delay of at least 6000 ms to reduce GDELT HTTP 429 responses.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const end = new Date();",
+          "const start = new Date(end.getTime() - Number(pm.collectionVariables.get('lookbackHours')) * 60 * 60 * 1000);",
+          "const gdeltDate = date => date.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);",
+          "pm.collectionVariables.set('startdatetime', gdeltDate(start));",
+          "pm.collectionVariables.set('enddatetime', gdeltDate(end));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.gdeltproject.org/api/v2/doc/doc"
+    },
+    {
+      "key": "keyword",
+      "value": "armed conflict"
+    },
+    {
+      "key": "lookbackHours",
+      "value": "24"
+    },
+    {
+      "key": "maxrecords",
+      "value": "50"
+    },
+    {
+      "key": "startdatetime",
+      "value": ""
+    },
+    {
+      "key": "enddatetime",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Single Configurable Keyword",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}?query=%22{{keyword}}%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "\"{{keyword}}\" sourcelang:english"
+            },
+            {
+              "key": "mode",
+              "value": "artlist"
+            },
+            {
+              "key": "format",
+              "value": "json"
+            },
+            {
+              "key": "maxrecords",
+              "value": "{{maxrecords}}"
+            },
+            {
+              "key": "startdatetime",
+              "value": "{{startdatetime}}"
+            },
+            {
+              "key": "enddatetime",
+              "value": "{{enddatetime}}"
+            },
+            {
+              "key": "sort",
+              "value": "datedesc"
+            }
+          ]
+        },
+        "description": "Change the collection variable `keyword` to test one keyword at a time."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contains an articles array', () => {",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.articles).to.be.an('array');",
+              "});",
+              "pm.test('Returned articles are English', () => {",
+              "  const articles = pm.response.json().articles || [];",
+              "  articles.forEach(article => pm.expect((article.language || '').toLowerCase()).to.eql('english'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Project Keywords - Run With 6000 ms Delay",
+      "item": [
+        {
+          "name": "Armed Conflict",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}?query=%22armed%20conflict%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+          }
+        },
+        {
+          "name": "Border Closure",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}?query=%22border%20closure%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+          }
+        },
+        {
+          "name": "Visa Restrictions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}?query=%22visa%20restrictions%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+          }
+        },
+        {
+          "name": "Shipping Disruption",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}?query=%22shipping%20disruption%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+          }
+        },
+        {
+          "name": "Displacement",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}?query=%22displacement%22%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords={{maxrecords}}&startdatetime={{startdatetime}}&enddatetime={{enddatetime}}&sort=datedesc"
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contains an articles array', () => pm.expect(pm.response.json().articles).to.be.an('array'));",
+              "pm.test('Returned articles are English', () => {",
+              "  const articles = pm.response.json().articles || [];",
+              "  articles.forEach(article => pm.expect((article.language || '').toLowerCase()).to.eql('english'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
