@@ -1,0 +1,45 @@
+services:
+  db:
+    build: ./strategic-risk-radar-db
+    image: strategic-risk-radar-db:local
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-risk_radar}
+      POSTGRES_USER: ${POSTGRES_USER:-risk_radar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-risk_radar}
+    ports:
+      - "5434:5432"
+    volumes:
+      - risk-radar-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-risk_radar} -d ${POSTGRES_DB:-risk_radar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ingestion:
+    build: ./strategic-risk-radar-python
+    image: strategic-risk-radar-python:local
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
+      RELIEFWEB_APPNAME: ${RELIEFWEB_APPNAME:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  data-studio:
+    build: ./strategic-risk-radar-data-studio
+    image: strategic-risk-radar-data-studio:local
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    ports:
+      - "${METABASE_PORT:-3000}:3000"
+    volumes:
+      - risk-radar-metabase:/metabase-data
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  risk-radar-db:
+  risk-radar-metabase:

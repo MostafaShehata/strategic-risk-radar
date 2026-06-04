@@ -1,0 +1,22 @@
+import httpx
+
+from risk_radar.sources import GdeltSource
+
+
+def test_gdelt_waits_between_keyword_requests(monkeypatch):
+    sleeps = []
+    times = iter([0.0, 0.0, 1.0, 6.0])
+    monkeypatch.setattr("risk_radar.sources.time.monotonic", lambda: next(times))
+    monkeypatch.setattr("risk_radar.sources.time.sleep", sleeps.append)
+
+    def handler(request):
+        return httpx.Response(200, json={"articles": []})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        source = GdeltSource({
+            "id": "gdelt", "url": "https://example.test",
+            "minimum_request_interval_seconds": 5.2, "retry_attempts": 1,
+        }, client)
+        list(source.fetch(("first", "second")))
+
+    assert sleeps == [5.2]
