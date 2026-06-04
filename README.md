@@ -50,8 +50,10 @@ Copy-Item .env.example .env
 .\bin\deploy-all.ps1
 ```
 
-Open `http://localhost:3000` to use the Angular Data Studio. The read-only API
-and interactive documentation are available at `http://localhost:8000/docs`.
+Open `http://localhost:3000` to use the Angular Data Studio. Select an
+ingestion run to inspect its source windows, errors, counts, and per-source
+keyword results together. The read-only API and interactive documentation are
+available at `http://localhost:8000/docs`.
 
 PostgreSQL is also exposed to the host on `localhost:5434` for tools such as
 pgAdmin. Containers use the internal address `db:5432`.

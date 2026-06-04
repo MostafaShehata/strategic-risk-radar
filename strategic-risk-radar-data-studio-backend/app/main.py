@@ -49,10 +49,40 @@ def runs(limit: int = Query(20, ge=1, le=200)) -> list[dict[str, Any]]:
     )
 
 
+@app.get("/api/runs/{run_id}")
+def run_detail(run_id: str) -> dict[str, Any]:
+    run_rows = query(
+        """SELECT id,started_at,completed_at,status,total_retrieved,total_matched,
+                  total_inserted,total_duplicates,error_count,config_snapshot
+           FROM ingestion_runs WHERE id=%s""",
+        (run_id,),
+    )
+    sources = query(
+        """SELECT id,source_id,source_type,status,window_start,window_end,request_count,
+                  retrieved_count,matched_count,inserted_count,duplicate_count,
+                  duration_ms,error_message
+           FROM source_runs WHERE run_id=%s ORDER BY started_at,source_id""",
+        (run_id,),
+    )
+    source_ids = [source["id"] for source in sources]
+    keyword_rows = query(
+        """SELECT source_run_id,keyword,request_count,retrieved_count,matched_count,
+                  inserted_count,duplicate_count
+           FROM keyword_run_metrics WHERE source_run_id=ANY(%s) ORDER BY keyword""",
+        (source_ids,),
+    ) if source_ids else []
+    keyword_map: dict[int, list[dict[str, Any]]] = {}
+    for keyword in keyword_rows:
+        keyword_map.setdefault(keyword["source_run_id"], []).append(keyword)
+    for source in sources:
+        source["keywords"] = keyword_map.get(source["id"], [])
+    return {"run": run_rows[0] if run_rows else None, "sources": sources}
+
+
 @app.get("/api/sources")
 def sources(limit: int = Query(50, ge=1, le=500)) -> list[dict[str, Any]]:
     return query(
-        """SELECT source_id,status,window_start,window_end,request_count,retrieved_count,
+        """SELECT id,run_id,source_id,status,window_start,window_end,request_count,retrieved_count,
                   matched_count,inserted_count,duplicate_count,duration_ms,error_message
            FROM source_runs ORDER BY started_at DESC LIMIT %s""",
         (limit,),
@@ -62,7 +92,7 @@ def sources(limit: int = Query(50, ge=1, le=500)) -> list[dict[str, Any]]:
 @app.get("/api/keywords")
 def keywords(limit: int = Query(100, ge=1, le=1000)) -> list[dict[str, Any]]:
     return query(
-        """SELECT s.source_id,k.keyword,k.request_count,k.retrieved_count,
+        """SELECT s.run_id,s.id AS source_run_id,s.source_id,k.keyword,k.request_count,k.retrieved_count,
                   k.matched_count,k.inserted_count,k.duplicate_count
            FROM keyword_run_metrics k JOIN source_runs s ON s.id=k.source_run_id
            ORDER BY s.started_at DESC,k.keyword LIMIT %s""",
@@ -85,4 +115,3 @@ def documents(
            ORDER BY coalesce(published_at,first_seen_at) DESC LIMIT %s""",
         (source, source, search, search, search, limit),
     )
-
