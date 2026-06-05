@@ -74,7 +74,7 @@ worker, preventing concurrent workers from violating the limit.
 ## Incremental Date Windows
 
 News ingestion runs continuously every `INGESTION_INTERVAL_MINUTES` minutes,
-defaulting to `30`. Each source resumes from the end of its latest successful
+defaulting to `1440` minutes, or 24 hours. Each source resumes from the end of its latest successful
 source run. If no successful run exists, or that date is older than
 `INGESTION_MAX_LOOKBACK_HOURS`, ingestion retrieves only that configured
 lookback period, currently defaulting to `24` hours for source testing. Failed source windows do not advance

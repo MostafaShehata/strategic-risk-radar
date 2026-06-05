@@ -26,7 +26,7 @@ using retrieved, matched, inserted, and duplicate metrics in Data Studio.
 Each source run stores its requested `window_start` and `window_end`. The next
 successful run resumes from the previous successful window end. Missing or
 stale state is clamped to `INGESTION_MAX_LOOKBACK_HOURS`. Defaults are a
-30-minute schedule and a 24-hour maximum lookback for source testing.
+24-hour schedule and a 24-hour maximum lookback for source testing.
 
 Use `ingest-news --once` to execute one cycle without starting the scheduler.
 
