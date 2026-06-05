@@ -57,7 +57,7 @@ services:
     build: ./strategic-risk-radar-data-studio-frontend
     image: strategic-risk-radar-data-studio-frontend:local
     ports:
-      - "${DATA_STUDIO_PORT:-3000}:80"
+      - "127.0.0.1:${DATA_STUDIO_PORT:-3000}:80"
     depends_on:
       - data-studio-backend
 

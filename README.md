@@ -50,13 +50,13 @@ Copy-Item .env.example .env
 .\bin\deploy-all.ps1
 ```
 
-Open `http://127.0.0.1:3000` to use the Angular Data Studio. Select an
+Open `http://localhost:3000` to use the Angular Data Studio. Select an
 ingestion run to inspect its source windows, errors, counts, and per-source
 keyword results together. The read-only API and interactive documentation are
-available at `http://127.0.0.1:8000/docs`.
+available at `http://localhost:8000/docs`.
 
-If `localhost` hangs on Windows with Docker Desktop, use `127.0.0.1` directly.
-The containers still expose the same host ports.
+The frontend port is bound to IPv4 loopback in `docker-compose.yml` to avoid a
+Windows Docker Desktop issue where IPv6 `localhost` can connect but hang.
 
 PostgreSQL is also exposed to the host on `localhost:5434` for tools such as
 pgAdmin. Containers use the internal address `db:5432`.
