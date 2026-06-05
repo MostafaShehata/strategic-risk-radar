@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "839d48d1-2512-45a0-a6e8-ea94001f5246",
     "name": "Strategic Risk Radar - GDELT English News",
-    "description": "Tests the GDELT DOC 2.0 API used by Strategic Risk Radar. The collection automatically searches the latest 24-hour UTC window and restricts results to English sources. When running multiple requests, configure a delay of at least 6000 ms to reduce GDELT HTTP 429 responses.",
+    "description": "Tests the GDELT DOC 2.0 API used by Strategic Risk Radar. The collection automatically searches the latest 24-hour UTC window and restricts results to English sources. When running multiple requests, configure a delay of at least 60000 ms if you want to mirror the application cooldown after GDELT HTTP 429 responses.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -111,7 +111,7 @@
       ]
     },
     {
-      "name": "Project Keyword Groups - Run With 6000 ms Delay",
+      "name": "Project Keyword Groups - Run With 60000 ms Delay",
       "item": [
         {
           "name": "Conflict Escalation",

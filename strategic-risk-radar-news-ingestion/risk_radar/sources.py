@@ -34,7 +34,10 @@ class Source(ABC):
             if attempt == attempts - 1:
                 response.raise_for_status()
             retry_after = response.headers.get("Retry-After", "")
-            delay = float(retry_after) if retry_after.isdigit() else max(minimum, 2**attempt)
+            if response.status_code == 429:
+                delay = float(retry_after) if retry_after.isdigit() else 60
+            else:
+                delay = float(retry_after) if retry_after.isdigit() else max(minimum, 2**attempt)
             time.sleep(delay)
         raise RuntimeError("Request retry loop exited unexpectedly")
 
