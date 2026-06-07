@@ -1,7 +1,9 @@
 import argparse
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from uuid import UUID
 
 import httpx
 
@@ -17,18 +19,32 @@ def run(
     max_lookback_hours: float,
 ) -> None:
     settings = load_settings(config_path)
+    run_ids = run_sources(settings, database_url, interval_minutes, max_lookback_hours, settings.sources)
+    print(f"ingestion cycle completed: {len(run_ids)} source jobs", flush=True)
+
+
+def run_source_job(
+    settings,
+    database_url: str,
+    interval_minutes: float,
+    max_lookback_hours: float,
+    source_config: dict,
+) -> UUID:
     store = Store(database_url)
     config_snapshot = {
-        **settings.snapshot,
+        "keywords": settings.snapshot.get("keywords", []),
+        "sources": [source_config],
         "runtime": {
             "interval_minutes": interval_minutes,
+            "source_schedule_minutes": float(source_config.get("schedule_minutes", interval_minutes)),
             "max_lookback_hours": max_lookback_hours,
         },
     }
     run_id = store.create_run(config_snapshot)
-    with httpx.Client(timeout=45, follow_redirects=True,
-                      headers={"User-Agent": "Strategic-Risk-Radar-PoC/0.2"}) as client:
-        for source_config in settings.sources:
+    source_run_id = None
+    try:
+        with httpx.Client(timeout=45, follow_redirects=True,
+                          headers={"User-Agent": "Strategic-Risk-Radar-PoC/0.2"}) as client:
             window = store.next_window(source_config["id"], max_lookback_hours)
             source_run_id = store.begin_source(
                 run_id, source_config["id"], source_config["type"], window
@@ -69,9 +85,31 @@ def run(
                         store.save_keyword_metric(source_run_id, keyword.name, 0, 0, 0, 0)
                 store.finish_source(source_run_id, "error", totals,
                                     int((time.monotonic() - started) * 1000), str(exc))
-                print(f"{source_config['id']}: {exc}")
-    store.finish_run(run_id)
-    print(f"ingestion run completed: {run_id}", flush=True)
+                print(f"{source_config['id']}: {exc}", flush=True)
+        store.finish_run(run_id)
+    except Exception:
+        store.finish_run(run_id)
+        raise
+    print(f"{source_config['id']} job completed: {run_id}", flush=True)
+    return run_id
+
+
+def run_sources(
+    settings,
+    database_url: str,
+    interval_minutes: float,
+    max_lookback_hours: float,
+    sources: tuple[dict, ...],
+) -> list[UUID]:
+    run_ids = []
+    with ThreadPoolExecutor(max_workers=max(1, len(sources))) as executor:
+        futures = [
+            executor.submit(run_source_job, settings, database_url, interval_minutes, max_lookback_hours, source)
+            for source in sources
+        ]
+        for future in as_completed(futures):
+            run_ids.append(future.result())
+    return run_ids
 
 
 def run_scheduler(
@@ -80,21 +118,45 @@ def run_scheduler(
     interval_minutes: float,
     max_lookback_hours: float,
 ) -> None:
-    interval_seconds = interval_minutes * 60
+    settings = load_settings(config_path)
+    if not settings.sources:
+        raise ValueError("No enabled ingestion sources are configured")
+
+    def source_runner(source_config: dict) -> None:
+        source_id = source_config["id"]
+        schedule_minutes = float(source_config.get("schedule_minutes", interval_minutes))
+        if schedule_minutes <= 0:
+            raise ValueError(f"{source_id}: schedule_minutes must be greater than zero")
+        schedule_seconds = schedule_minutes * 60
+        while True:
+            started = time.monotonic()
+            print(
+                f"{source_id} runner dispatch: {datetime.now(timezone.utc).isoformat()} "
+                f"(schedule={schedule_minutes}m, max_lookback={max_lookback_hours}h)",
+                flush=True,
+            )
+            try:
+                run_source_job(settings, database_url, interval_minutes, max_lookback_hours, source_config)
+            except Exception as exc:
+                print(f"{source_id} runner failed: {exc}", flush=True)
+            sleep_seconds = max(0.0, schedule_seconds - (time.monotonic() - started))
+            print(f"{source_id} runner sleeping for {sleep_seconds:.0f}s", flush=True)
+            time.sleep(sleep_seconds)
+
+    print(
+        f"scheduler starting {len(settings.sources)} independent source runners",
+        flush=True,
+    )
     while True:
-        cycle_started = time.monotonic()
-        print(
-            f"scheduler cycle started: {datetime.now(timezone.utc).isoformat()} "
-            f"(interval={interval_minutes}m, max_lookback={max_lookback_hours}h)",
-            flush=True,
-        )
-        try:
-            run(config_path, database_url, interval_minutes, max_lookback_hours)
-        except Exception as exc:
-            print(f"ingestion cycle failed: {exc}", flush=True)
-        remaining = max(0, interval_seconds - (time.monotonic() - cycle_started))
-        print(f"next cycle in {remaining:.0f} seconds", flush=True)
-        time.sleep(remaining)
+        with ThreadPoolExecutor(max_workers=len(settings.sources)) as executor:
+            futures = [
+                executor.submit(source_runner, source)
+                for source in settings.sources
+            ]
+            for future in as_completed(futures):
+                future.result()
+        print("scheduler workers stopped; restarting in 5s", flush=True)
+        time.sleep(5)
 
 
 def main() -> None:

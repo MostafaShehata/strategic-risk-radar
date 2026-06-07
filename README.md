@@ -14,11 +14,14 @@ The repository contains four independently buildable projects:
 
 ```mermaid
 flowchart LR
-    G["GDELT API<br/>5.2s request interval"] --> P["News ingestion worker"]
-    R["Guardian Content API"] --> P
-    U["UN News RSS"] --> P
-    D["GDACS RSS"] --> P
-    P -->|"raw documents + observations + metrics"| DB["PostgreSQL"]
+    G["GDELT API<br/>5.2s request interval"] --> PG["GDELT runner"]
+    R["Guardian Content API"] --> PR["Guardian runner"]
+    U["UN News RSS"] --> PU["UN News runner"]
+    D["GDACS RSS"] --> PD["GDACS runner"]
+    PG -->|"raw documents + observations + metrics"| DB["PostgreSQL"]
+    PR -->|"raw documents + observations + metrics"| DB
+    PU -->|"raw documents + observations + metrics"| DB
+    PD -->|"raw documents + observations + metrics"| DB
     DB --> B["FastAPI Data Studio backend<br/>localhost:8000"]
     B --> A["Angular Data Studio<br/>localhost:3000"]
     DB --> N["Future filtering and<br/>deduplication agent"]
@@ -26,7 +29,7 @@ flowchart LR
 
 ## Data Model
 
-- `ingestion_runs`: one row for every complete ingestion execution.
+- `ingestion_runs`: one row for every source job execution.
 - `source_runs`: status, requested date window, counts, duration, and error.
 - `keyword_run_metrics`: documents retrieved, matched, inserted, and duplicated
   for every source and keyword.
@@ -51,10 +54,12 @@ Copy-Item .env.example .env
 .\bin\deploy-all.ps1
 ```
 
-Open `http://localhost:3000` to use the Angular Data Studio. Select an
-ingestion run to inspect its source windows, errors, counts, and per-source
-keyword results together. The read-only API and interactive documentation are
-available at `http://localhost:8000/docs`.
+Open `http://localhost:3000` to use the Angular Data Studio. Select a source
+job to inspect its source window, errors, counts, and per-keyword results. The
+left menu can filter jobs by source type and status, including currently
+running jobs. The document browser can filter by source and keyword. The
+read-only API and interactive documentation are available at
+`http://localhost:8000/docs`.
 
 The frontend port is bound to IPv4 loopback in `docker-compose.yml` to avoid a
 Windows Docker Desktop issue where IPv6 `localhost` can connect but hang.
@@ -62,24 +67,30 @@ Windows Docker Desktop issue where IPv6 `localhost` can connect but hang.
 PostgreSQL is also exposed to the host on `localhost:5434` for tools such as
 pgAdmin. Containers use the internal address `db:5432`.
 
-The UI provides document browsing and run, source-window, and keyword views.
+The UI provides document browsing and run, source-window, source-type, status,
+and keyword views.
 
 ## GDELT Limit
 
-GDELT receives one request per keyword group. The worker enforces a
+GDELT receives one request per keyword group. The GDELT runner enforces a
 configurable minimum interval of `5.2` seconds before every subsequent GDELT
 request. If GDELT returns HTTP `429 Too Many Requests`, the worker sleeps for
-`60` seconds before retrying. The deployment intentionally runs one ingestion
-worker, preventing concurrent workers from violating the limit.
+`60` seconds before retrying. Only one GDELT runner is configured, preventing
+parallel GDELT requests from violating the limit while other source runners can
+continue independently.
 
 ## Incremental Date Windows
 
-News ingestion runs continuously every `INGESTION_INTERVAL_MINUTES` minutes,
-defaulting to `1440` minutes, or 24 hours. Each source resumes from the end of its latest successful
-source run. If no successful run exists, or that date is older than
+News ingestion starts one independent runner per configured source. Each source
+can set `schedule_minutes` in `strategic-risk-radar-news-ingestion/config/sources.yaml`;
+the current PoC default is `30` minutes for all four sources.
+`INGESTION_INTERVAL_MINUTES` remains the fallback schedule for sources that do
+not set `schedule_minutes`. Each source resumes from the end of its latest
+successful source run. If no successful run exists, or that date is older than
 `INGESTION_MAX_LOOKBACK_HOURS`, ingestion retrieves only that configured
-lookback period, currently defaulting to `24` hours for source testing. Failed source windows do not advance
-the latest successful window, so they can be retried.
+lookback period, currently defaulting to `24` hours for source testing. Failed
+source windows do not advance the latest successful window, so they can be
+retried.
 
 Only English news is persisted. GDELT requests explicitly select English
 sources, Guardian requests use English language filtering, and the selected RSS
@@ -92,6 +103,6 @@ The root `bin` directory builds, tests, deploys, and stops the complete stack.
 
 Runtime containers use explicit names without Docker Compose numeric suffixes.
 News ingestion remains running as a scheduler container and records a separate
-database run for every scheduled cycle.
+database run for every source job execution.
 
 See [TRACE.md](TRACE.md) for the detailed execution trace.

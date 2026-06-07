@@ -1,11 +1,12 @@
 # Strategic Risk Radar News Ingestion
 
-Configuration-driven Python ingestion scheduler. It runs immediately on
-startup, repeats every `INGESTION_INTERVAL_MINUTES` minutes, records full
-execution metrics, and continues when one source fails.
+Configuration-driven Python ingestion scheduler. It starts one independent
+runner per enabled source, runs each source immediately on startup, repeats by
+that source's `schedule_minutes`, records full execution metrics, and continues
+when another source fails or retries.
 
 GDELT is called once per keyword group. `minimum_request_interval_seconds: 5.2`
-enforces more than five seconds between requests from the single worker. If
+enforces more than five seconds between requests from the GDELT runner. If
 GDELT returns HTTP `429 Too Many Requests`, the worker sleeps for `60` seconds
 and then retries.
 
@@ -26,9 +27,12 @@ using retrieved, matched, inserted, and duplicate metrics in Data Studio.
 Each source run stores its requested `window_start` and `window_end`. The next
 successful run resumes from the previous successful window end. Missing or
 stale state is clamped to `INGESTION_MAX_LOOKBACK_HOURS`. Defaults are a
-24-hour schedule and a 24-hour maximum lookback for source testing.
+30-minute per-source schedule and a 24-hour maximum lookback for source
+testing. `INGESTION_INTERVAL_MINUTES` is used as a fallback when a source does
+not define `schedule_minutes`.
 
-Use `ingest-news --once` to execute one cycle without starting the scheduler.
+Use `ingest-news --once` to execute every enabled source once in parallel
+without starting the scheduler.
 
 ## Test GDELT With Postman
 

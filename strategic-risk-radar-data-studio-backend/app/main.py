@@ -32,6 +32,7 @@ def overview() -> dict[str, Any]:
     return query(
         """SELECT count(*) AS total_runs,
                   count(*) FILTER (WHERE status='completed') AS completed_runs,
+                  count(*) FILTER (WHERE status='running') AS running_runs,
                   count(*) FILTER (WHERE status='completed_with_errors') AS runs_with_errors,
                   coalesce(sum(total_inserted),0) AS total_inserted,
                   (SELECT count(*) FROM raw_news_items) AS total_documents
@@ -40,12 +41,27 @@ def overview() -> dict[str, Any]:
 
 
 @app.get("/api/runs")
-def runs(limit: int = Query(20, ge=1, le=200)) -> list[dict[str, Any]]:
+def runs(
+    limit: int = Query(20, ge=1, le=200),
+    source_type: str = "",
+    status: str = "",
+) -> list[dict[str, Any]]:
     return query(
-        """SELECT id,started_at,completed_at,status,total_retrieved,total_matched,
-                  total_inserted,total_duplicates,error_count
-           FROM ingestion_runs ORDER BY started_at DESC LIMIT %s""",
-        (limit,),
+        """SELECT r.id,r.started_at,r.completed_at,r.status,r.total_retrieved,r.total_matched,
+                  r.total_inserted,r.total_duplicates,r.error_count,
+                  s.id AS source_run_id,s.source_id,s.source_type,s.duration_ms
+           FROM ingestion_runs r
+           LEFT JOIN LATERAL (
+               SELECT id,source_id,source_type,duration_ms
+               FROM source_runs
+               WHERE run_id=r.id
+               ORDER BY started_at
+               LIMIT 1
+           ) s ON true
+           WHERE (%s='' OR s.source_type=%s)
+             AND (%s='' OR r.status=%s)
+           ORDER BY r.started_at DESC LIMIT %s""",
+        (source_type, source_type, status, status, limit),
     )
 
 
@@ -80,12 +96,20 @@ def run_detail(run_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/sources")
-def sources(limit: int = Query(50, ge=1, le=500)) -> list[dict[str, Any]]:
+def sources(
+    limit: int = Query(50, ge=1, le=500),
+    source_type: str = "",
+    status: str = "",
+) -> list[dict[str, Any]]:
     return query(
         """SELECT id,run_id,source_id,status,window_start,window_end,request_count,retrieved_count,
-                  matched_count,inserted_count,duplicate_count,duration_ms,error_message
-           FROM source_runs ORDER BY started_at DESC LIMIT %s""",
-        (limit,),
+                  matched_count,inserted_count,duplicate_count,duration_ms,error_message,source_type
+           FROM source_runs
+           WHERE source_type <> 'reliefweb'
+             AND (%s='' OR source_type=%s)
+             AND (%s='' OR status=%s)
+           ORDER BY started_at DESC LIMIT %s""",
+        (source_type, source_type, status, status, limit),
     )
 
 
@@ -104,14 +128,39 @@ def keywords(limit: int = Query(100, ge=1, le=1000)) -> list[dict[str, Any]]:
 def documents(
     search: str = "",
     source: str = "",
+    keyword: str = "",
     limit: int = Query(100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     return query(
         """SELECT id,source_id,title,url,summary,published_at,first_seen_at,
                   processing_status,keywords
-           FROM v_documents_browse
+           FROM v_documents_browse d
            WHERE (%s='' OR source_id=%s)
+             AND (%s='' OR EXISTS (
+                 SELECT 1 FROM raw_news_item_keywords k
+                 WHERE k.item_id=d.id AND k.keyword=%s
+             ))
              AND (%s='' OR title ILIKE '%%'||%s||'%%' OR summary ILIKE '%%'||%s||'%%')
            ORDER BY coalesce(published_at,first_seen_at) DESC LIMIT %s""",
-        (source, source, search, search, search, limit),
+        (source, source, keyword, keyword, search, search, search, limit),
+    )
+
+
+@app.get("/api/source-types")
+def source_types() -> list[dict[str, Any]]:
+    return query(
+        """SELECT DISTINCT source_type
+           FROM source_runs
+           WHERE source_type IS NOT NULL
+             AND source_type <> 'reliefweb'
+           ORDER BY source_type"""
+    )
+
+
+@app.get("/api/document-keywords")
+def document_keywords() -> list[dict[str, Any]]:
+    return query(
+        """SELECT DISTINCT keyword
+           FROM raw_news_item_keywords
+           ORDER BY keyword"""
     )

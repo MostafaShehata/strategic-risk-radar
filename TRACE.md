@@ -8,26 +8,29 @@ This trace follows one invocation of the ingestion container.
 2. The ingestion image starts with `ingest-news --config config/sources.yaml`.
 3. The console entry point maps to `risk_radar.cli:main`.
 4. `main()` reads the scheduler interval and maximum lookback configuration.
-5. One cycle runs immediately, then the process sleeps until the next interval.
+5. The scheduler starts one independent runner per configured source.
+6. Each source runner runs immediately, then sleeps until its own next
+   `schedule_minutes` interval.
 
 ## 2. Configuration
 
-1. `run()` calls `load_settings()` in `risk_radar/config.py`.
+1. `run_scheduler()` calls `load_settings()` in `risk_radar/config.py`.
 2. YAML keywords and enabled sources are loaded.
 3. `GUARDIAN_API_KEY` is resolved from the container environment, falling back
    to Guardian's public `test` key for PoC development.
-4. The unchanged YAML structure is retained as the run's configuration
-   snapshot for auditing.
+4. Each source job keeps the global keywords and that source's YAML structure
+   as its configuration snapshot for auditing.
 
 ## 3. Run Creation
 
-1. `Store.create_run()` inserts one `ingestion_runs` row.
+1. `run_source_job()` starts for one configured source.
+2. `Store.create_run()` inserts one `ingestion_runs` row for that source job.
 2. PostgreSQL generates the run UUID.
 3. The run begins with status `running`.
 
 ## 4. Source Execution And Date Window
 
-For every configured source:
+For the source assigned to the runner:
 
 1. `Store.next_window()` reads the latest successful source window.
 2. The start time is clamped to no earlier than the configured maximum
@@ -69,11 +72,12 @@ For each matching document:
 
 1. `Store.save_keyword_metric()` records per-source, per-keyword metrics.
 2. `Store.finish_source()` records source totals, duration, status, and error.
-3. A failing source is recorded as `error`; remaining sources continue.
+3. A failing source is recorded as `error`; the other source runners continue.
 4. `Store.finish_run()` aggregates all source rows into the parent run.
 
 ## 7. Browsing
 
 1. The FastAPI backend reads PostgreSQL through read-only endpoints.
 2. The Angular frontend calls the backend through the Nginx `/api` proxy.
-3. Users browse documents and inspect runs, source windows, and keywords.
+3. Users filter source jobs by source type and status in the left menu.
+4. Users browse documents and filter raw evidence by source and keyword.

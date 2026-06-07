@@ -19,6 +19,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
     <main>
       <section class="cards" *ngIf="overview">
         <article><label>Ingestion runs</label><strong>{{overview.total_runs}}</strong></article>
+        <article><label>Running jobs</label><strong>{{overview.running_runs}}</strong></article>
         <article><label>Stored documents</label><strong>{{overview.total_documents}}</strong></article>
         <article><label>New documents</label><strong>{{overview.total_inserted}}</strong></article>
         <article class="warning"><label>Runs with source errors</label><strong>{{overview.runs_with_errors}}</strong></article>
@@ -30,9 +31,14 @@ import { bootstrapApplication } from '@angular/platform-browser';
 
       <section *ngIf="tab==='Run Intelligence'" class="run-layout">
         <aside class="panel run-list">
-          <div class="section-heading"><div><span class="eyebrow dark">RUN HISTORY</span><h2>Ingestion runs</h2></div></div>
+          <div class="section-heading"><div><span class="eyebrow dark">SOURCE JOBS</span><h2>Running process</h2></div></div>
+          <div class="filters compact">
+            <select [(ngModel)]="runSourceType" (change)="loadRuns()"><option value="">All source types</option><option *ngFor="let t of sourceTypes">{{t}}</option></select>
+            <select [(ngModel)]="runStatus" (change)="loadRuns()"><option value="">All statuses</option><option value="running">Running</option><option value="completed">Completed</option><option value="completed_with_errors">Completed with errors</option></select>
+          </div>
           <button class="run-card" *ngFor="let run of runs" [class.selected]="selectedRunId===run.id" (click)="selectRun(run.id)">
-            <div><strong>{{run.started_at | date:'medium'}}</strong><span class="badge" [class.bad]="run.error_count">{{run.status}}</span></div>
+            <div><strong>{{run.source_id || 'source job'}}</strong><span class="badge" [class.bad]="run.error_count">{{run.status}}</span></div>
+            <small>{{run.source_type}} - {{run.started_at | date:'medium'}}</small>
             <div class="mini-metrics"><span>{{run.total_retrieved}} retrieved</span><span>{{run.total_inserted}} new</span><span>{{run.error_count}} errors</span></div>
           </button>
         </aside>
@@ -74,6 +80,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
         <div class="filters">
           <input [(ngModel)]="search" (keyup.enter)="loadDocuments()" placeholder="Search titles and summaries">
           <select [(ngModel)]="source"><option value="">All sources</option><option *ngFor="let s of sourceNames">{{s}}</option></select>
+          <select [(ngModel)]="keyword"><option value="">All keywords</option><option *ngFor="let k of keywords">{{k}}</option></select>
           <button (click)="loadDocuments()">Search</button>
         </div>
         <div class="documents">
@@ -90,24 +97,33 @@ import { bootstrapApplication } from '@angular/platform-browser';
 class App implements OnInit {
   tabs = ['Run Intelligence', 'Documents']; tab = 'Run Intelligence';
   overview: any; runs: any[] = []; documents: any[] = []; runDetail: any;
-  selectedRunId = ''; search = ''; source = ''; sourceNames: string[] = [];
+  selectedRunId = ''; search = ''; source = ''; keyword = ''; runSourceType = ''; runStatus = '';
+  sourceNames: string[] = []; sourceTypes: string[] = []; keywords: string[] = [];
   constructor(private http: HttpClient) {}
   ngOnInit() { this.loadAll(); }
   loadAll() {
     this.http.get('/api/overview').subscribe(v => this.overview = v);
-    this.http.get<any[]>('/api/runs').subscribe(v => {
-      this.runs = v;
-      if (v.length && !this.selectedRunId) this.selectRun(v[0].id);
+    this.loadRuns();
+    this.http.get<any[]>('/api/sources').subscribe(v => {
+      this.sourceNames = [...new Set(v.map(x => x.source_id))];
     });
-    this.http.get<any[]>('/api/sources').subscribe(v => this.sourceNames = [...new Set(v.map(x => x.source_id))]);
+    this.http.get<any[]>('/api/source-types').subscribe(v => this.sourceTypes = v.map(x => x.source_type));
+    this.http.get<any[]>('/api/document-keywords').subscribe(v => this.keywords = v.map(x => x.keyword));
     this.loadDocuments();
+  }
+  loadRuns() {
+    const q = new URLSearchParams({source_type: this.runSourceType, status: this.runStatus});
+    this.http.get<any[]>('/api/runs?' + q).subscribe(v => {
+      this.runs = v;
+      if (v.length && (!this.selectedRunId || !v.some(run => run.id === this.selectedRunId))) this.selectRun(v[0].id);
+    });
   }
   selectRun(id: string) {
     this.selectedRunId = id;
     this.http.get('/api/runs/' + id).subscribe(v => this.runDetail = v);
   }
   loadDocuments() {
-    const q = new URLSearchParams({search: this.search, source: this.source});
+    const q = new URLSearchParams({search: this.search, source: this.source, keyword: this.keyword});
     this.http.get<any[]>('/api/documents?' + q).subscribe(v => this.documents = v);
   }
 }
