@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 set -eu
+docker compose up -d model
 docker compose up -d db
 docker compose run --rm db-migrate
 docker compose up -d data-studio-backend data-studio-frontend

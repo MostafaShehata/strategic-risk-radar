@@ -1,4 +1,23 @@
 services:
+  model:
+    container_name: strategic-risk-radar-model
+    build: ./strategic-risk-radar-model
+    image: strategic-risk-radar-model:local
+    restart: unless-stopped
+    environment:
+      OLLAMA_MODEL: deepseek-r1:1.5b
+      OLLAMA_HOST: 0.0.0.0:11434
+    ports:
+      - "127.0.0.1:${MODEL_PORT:-11435}:11434"
+    volumes:
+      - risk-radar-ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
   db:
     container_name: strategic-risk-radar-db
     build: ./strategic-risk-radar-db
@@ -63,4 +82,5 @@ services:
       - data-studio-backend
 
 volumes:
+  risk-radar-ollama:
   risk-radar-db:
