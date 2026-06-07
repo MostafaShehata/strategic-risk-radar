@@ -18,6 +18,33 @@ services:
       retries: 20
       start_period: 60s
 
+  vector-db:
+    container_name: strategic-risk-radar-vectordb
+    build: ./strategic-risk-radar-vectordb
+    image: strategic-risk-radar-vectordb:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${QDRANT_PORT:-6334}:6333"
+    volumes:
+      - risk-radar-qdrant:/qdrant/storage
+
+  rag-api:
+    container_name: strategic-risk-radar-rag-api
+    build: ./strategic-risk-radar-rag-api
+    image: strategic-risk-radar-rag-api:local
+    restart: unless-stopped
+    environment:
+      QDRANT_URL: http://vector-db:6333
+      RAG_COLLECTION_NAME: strategic_risk_radar_docs
+      EMBEDDING_MODEL_NAME: BAAI/bge-small-en-v1.5
+      RAG_VECTOR_SIZE: "384"
+      RAG_TOP_K: "5"
+      CHUNK_MAX_WORDS: "180"
+    ports:
+      - "127.0.0.1:${RAG_API_PORT:-8100}:8100"
+    depends_on:
+      - vector-db
+
   db:
     container_name: strategic-risk-radar-db
     build: ./strategic-risk-radar-db
@@ -83,4 +110,5 @@ services:
 
 volumes:
   risk-radar-ollama:
+  risk-radar-qdrant:
   risk-radar-db:
