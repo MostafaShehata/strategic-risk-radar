@@ -6,9 +6,10 @@ class EntityExtractionAgent(BaseAgent):
     def __call__(self, state: EnrichmentState) -> EnrichmentState:
         text = self.article_text(state)
         entities = empty_entities()
-        self.add_rule_entities(text, entities)
         llm_entities = self.ollama.json_task(
-            "Extract entities from news as strict JSON only. Keys: countries,cities,airports,ports,airlines,companies,organizations,persons,military_groups,government_agencies. Values are arrays of strings.",
+            "Extract named entities from the news article as strict JSON only. "
+            "Keys: countries,cities,airports,ports,airlines,companies,organizations,persons,military_groups,government_agencies. "
+            "Values are arrays of strings. Do not infer entities that are not mentioned.",
             text[:6000],
         )
         for key in entities:

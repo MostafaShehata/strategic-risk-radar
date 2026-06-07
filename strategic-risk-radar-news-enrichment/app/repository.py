@@ -239,7 +239,7 @@ class EnrichmentRepository:
 
     def save_topic_link(self, connection, enriched_id: UUID, state: EnrichmentState) -> None:
         topic = state.get("topic")
-        if not topic:
+        if not topic or not (topic.topic_key or topic.title):
             return
         affected_kpis = json.dumps(topic.affected_kpis or [impact.kpi_name for impact in state.get("kpi_impacts", [])])
         topic_id = topic.topic_id or connection.execute(
@@ -247,7 +247,7 @@ class EnrichmentRepository:
                                   primary_countries,primary_domains,affected_kpis,signature)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s) RETURNING id""",
             (
-                topic.title or state.get("title", "Untitled strategic topic"),
+                topic.title,
                 topic.summary or state.get("summary", ""),
                 state.get("risk_score", 0),
                 state.get("risk_level", "low"),
@@ -257,7 +257,7 @@ class EnrichmentRepository:
                 self.entity_names(state, "countries"),
                 json.dumps(state.get("risk_domains", [])),
                 affected_kpis,
-                topic.topic_key or self.topic_signature(state),
+                  topic.topic_key,
             ),
         ).fetchone()[0]
         if topic.topic_id:
@@ -289,9 +289,6 @@ class EnrichmentRepository:
             (topic_id, enriched_id, topic.similarity_score, topic.llm_match_confidence, topic.action == "create"),
         )
 
-    def find_topic_by_signature(self, signature: str) -> tuple[str, float] | None:
-        return self.find_topic_by_key(signature)
-
     def find_topic_by_key(self, topic_key: str) -> tuple[str, float] | None:
         if not topic_key:
             return None
@@ -301,10 +298,5 @@ class EnrichmentRepository:
                    WHERE topic_key=%s OR signature=%s
                    ORDER BY updated_at DESC LIMIT 1""",
                 (topic_key, topic_key),
-            ).fetchone()
+              ).fetchone()
         return (str(row[0]), 0.95) if row else None
-
-    def topic_signature(self, state: EnrichmentState) -> str:
-        countries = sorted(entity.normalized_name or entity.name for entity in state.get("entities", {}).get("countries", []))
-        domains = sorted(state.get("risk_domains", []))
-        return "|".join(countries[:3] + domains[:3])

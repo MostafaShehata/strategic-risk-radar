@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     crawler_min_body_chars: int = 400
     firecrawler_timeout_seconds: int = 5
     topic_match_threshold: float = 0.90
-    enable_llm: bool = False
+    enable_llm: bool = True
     enable_topic_llm: bool = True
     enable_rag_indexing: bool = True
     model_request_timeout_seconds: int = 90
