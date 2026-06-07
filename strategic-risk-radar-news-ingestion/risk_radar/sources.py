@@ -71,6 +71,7 @@ class GdeltSource(Source):
             items = tuple(RawItem(
                 self.config["id"], "api", stable_id(a.get("url", ""), a.get("title", "")),
                 a.get("url", ""), a.get("title", ""), a.get("seendate", ""),
+                a.get("seendate", ""),
                 parse_datetime(a.get("seendate")), keyword.name, a,
             ) for a in articles)
             yield KeywordResult(keyword.name, 1, len(articles), items)
@@ -98,9 +99,10 @@ class GuardianSource(Source):
                 fields = article.get("fields", {})
                 title = strip_html(fields.get("headline") or article.get("webTitle", ""))
                 summary = strip_html(fields.get("trailText") or fields.get("bodyText", ""))
+                body = strip_html(fields.get("bodyText") or summary)
                 items.append(RawItem(
                     self.config["id"], "api", article.get("id", stable_id(article.get("webUrl", ""), title)),
-                    article.get("webUrl", ""), title, summary,
+                    article.get("webUrl", ""), title, summary, body,
                     parse_datetime(article.get("webPublicationDate")), keyword.name, article,
                 ))
             yield KeywordResult(keyword.name, 1, len(results), tuple(items))
@@ -120,9 +122,10 @@ class RssSource(Source):
                 title, summary = entry.get("title", ""), entry.get("summary", "")
                 if any(contains_keyword(f"{title} {summary}", term) for term in keyword.terms):
                     url = entry.get("link", "")
+                    body = strip_html(entry.get("content", [{}])[0].get("value", "") if entry.get("content") else summary)
                     items.append(RawItem(
                         self.config["id"], "rss", str(entry.get("id") or stable_id(url, title)),
-                        url, title, summary,
+                        url, title, summary, body,
                         parse_datetime(entry.get("published") or entry.get("updated")),
                         keyword.name, dict(entry),
                     ))

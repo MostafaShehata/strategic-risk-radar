@@ -37,7 +37,7 @@ sources:
     url: https://api.gdeltproject.org/api/v2/doc/doc
     max_records: 50
     minimum_request_interval_seconds: 5.2
-    schedule_minutes: 30
+    schedule_minutes: 10
     retry_attempts: 3
 
   - id: guardian
@@ -47,19 +47,19 @@ sources:
     api_key_env: GUARDIAN_API_KEY
     api_key: test
     max_records: 50
-    schedule_minutes: 30
+    schedule_minutes: 10
     retry_attempts: 3
 
   - id: un_news_middle_east
     type: rss
     enabled: true
     url: https://news.un.org/feed/subscribe/en/news/region/middle-east/feed/rss.xml
-    schedule_minutes: 30
+    schedule_minutes: 10
     retry_attempts: 3
 
   - id: gdacs_alerts
     type: rss
     enabled: true
     url: https://www.gdacs.org/xml/rss.xml
-    schedule_minutes: 30
+    schedule_minutes: 10
     retry_attempts: 3

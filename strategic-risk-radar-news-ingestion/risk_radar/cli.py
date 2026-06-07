@@ -16,10 +16,11 @@ def run(
     config_path: str,
     database_url: str,
     interval_minutes: float,
-    max_lookback_hours: float,
+    backfill_days: float,
+    regular_window_minutes: float,
 ) -> None:
     settings = load_settings(config_path)
-    run_ids = run_sources(settings, database_url, interval_minutes, max_lookback_hours, settings.sources)
+    run_ids = run_sources(settings, database_url, interval_minutes, backfill_days, regular_window_minutes, settings.sources)
     print(f"ingestion cycle completed: {len(run_ids)} source jobs", flush=True)
 
 
@@ -27,7 +28,8 @@ def run_source_job(
     settings,
     database_url: str,
     interval_minutes: float,
-    max_lookback_hours: float,
+    backfill_days: float,
+    regular_window_minutes: float,
     source_config: dict,
 ) -> UUID:
     store = Store(database_url)
@@ -37,7 +39,8 @@ def run_source_job(
         "runtime": {
             "interval_minutes": interval_minutes,
             "source_schedule_minutes": float(source_config.get("schedule_minutes", interval_minutes)),
-            "max_lookback_hours": max_lookback_hours,
+            "backfill_days": backfill_days,
+            "regular_window_minutes": regular_window_minutes,
         },
     }
     run_id = store.create_run(config_snapshot)
@@ -45,7 +48,7 @@ def run_source_job(
     try:
         with httpx.Client(timeout=45, follow_redirects=True,
                           headers={"User-Agent": "Strategic-Risk-Radar-PoC/0.2"}) as client:
-            window = store.next_window(source_config["id"], max_lookback_hours)
+            window = store.next_window(source_config["id"], backfill_days, regular_window_minutes)
             source_run_id = store.begin_source(
                 run_id, source_config["id"], source_config["type"], window
             )
@@ -98,13 +101,15 @@ def run_sources(
     settings,
     database_url: str,
     interval_minutes: float,
-    max_lookback_hours: float,
+    backfill_days: float,
+    regular_window_minutes: float,
     sources: tuple[dict, ...],
 ) -> list[UUID]:
     run_ids = []
     with ThreadPoolExecutor(max_workers=max(1, len(sources))) as executor:
         futures = [
-            executor.submit(run_source_job, settings, database_url, interval_minutes, max_lookback_hours, source)
+            executor.submit(run_source_job, settings, database_url, interval_minutes, backfill_days,
+                            regular_window_minutes, source)
             for source in sources
         ]
         for future in as_completed(futures):
@@ -116,7 +121,8 @@ def run_scheduler(
     config_path: str,
     database_url: str,
     interval_minutes: float,
-    max_lookback_hours: float,
+    backfill_days: float,
+    regular_window_minutes: float,
 ) -> None:
     settings = load_settings(config_path)
     if not settings.sources:
@@ -132,11 +138,13 @@ def run_scheduler(
             started = time.monotonic()
             print(
                 f"{source_id} runner dispatch: {datetime.now(timezone.utc).isoformat()} "
-                f"(schedule={schedule_minutes}m, max_lookback={max_lookback_hours}h)",
+                f"(schedule={schedule_minutes}m, backfill_days={backfill_days}, "
+                f"regular_window={regular_window_minutes}m)",
                 flush=True,
             )
             try:
-                run_source_job(settings, database_url, interval_minutes, max_lookback_hours, source_config)
+                run_source_job(settings, database_url, interval_minutes, backfill_days, regular_window_minutes,
+                               source_config)
             except Exception as exc:
                 print(f"{source_id} runner failed: {exc}", flush=True)
             sleep_seconds = max(0.0, schedule_seconds - (time.monotonic() - started))
@@ -165,16 +173,19 @@ def main() -> None:
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
     database_url = os.environ["DATABASE_URL"]
-    interval_minutes = float(os.getenv("INGESTION_INTERVAL_MINUTES", "30"))
-    max_lookback_hours = float(os.getenv("INGESTION_MAX_LOOKBACK_HOURS", "24"))
+    interval_minutes = float(os.getenv("INGESTION_INTERVAL_MINUTES", "10"))
+    backfill_days = float(os.getenv("INGESTION_BACKFILL_DAYS", "7"))
+    regular_window_minutes = float(os.getenv("INGESTION_REGULAR_WINDOW_MINUTES", str(interval_minutes)))
     if interval_minutes <= 0:
         raise ValueError("INGESTION_INTERVAL_MINUTES must be greater than zero")
-    if max_lookback_hours <= 0:
-        raise ValueError("INGESTION_MAX_LOOKBACK_HOURS must be greater than zero")
+    if backfill_days <= 0:
+        raise ValueError("INGESTION_BACKFILL_DAYS must be greater than zero")
+    if regular_window_minutes <= 0:
+        raise ValueError("INGESTION_REGULAR_WINDOW_MINUTES must be greater than zero")
     if args.once:
-        run(args.config, database_url, interval_minutes, max_lookback_hours)
+        run(args.config, database_url, interval_minutes, backfill_days, regular_window_minutes)
     else:
-        run_scheduler(args.config, database_url, interval_minutes, max_lookback_hours)
+        run_scheduler(args.config, database_url, interval_minutes, backfill_days, regular_window_minutes)
 
 
 if __name__ == "__main__":

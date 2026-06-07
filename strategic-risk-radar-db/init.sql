@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS raw_news_items (
     url TEXT NOT NULL,
     title TEXT NOT NULL,
     summary TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
     published_at TIMESTAMPTZ,
     raw_payload JSONB NOT NULL,
     first_seen_run_id UUID NOT NULL REFERENCES ingestion_runs(id),
@@ -64,6 +65,8 @@ CREATE TABLE IF NOT EXISTS raw_news_items (
     processing_status TEXT NOT NULL DEFAULT 'pending',
     UNIQUE (source_id, external_id)
 );
+
+ALTER TABLE raw_news_items ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS raw_news_item_keywords (
     item_id UUID NOT NULL REFERENCES raw_news_items(id) ON DELETE CASCADE,
@@ -93,8 +96,9 @@ FROM ingestion_runs r
 LEFT JOIN source_runs s ON s.run_id = r.id
 GROUP BY r.id;
 
-CREATE OR REPLACE VIEW v_documents_browse AS
-SELECT n.id, n.source_id, n.title, n.url, n.summary, n.published_at,
+DROP VIEW IF EXISTS v_documents_browse;
+CREATE VIEW v_documents_browse AS
+SELECT n.id, n.source_id, n.title, n.url, n.summary, n.body, n.published_at,
        n.first_seen_at, n.processing_status,
        string_agg(k.keyword, ', ' ORDER BY k.keyword) AS keywords
 FROM raw_news_items n

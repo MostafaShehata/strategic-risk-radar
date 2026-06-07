@@ -11,11 +11,20 @@ from .models import RawItem, TimeWindow
 def calculate_window(
     end: datetime,
     last_successful_end: datetime | None,
-    max_lookback_hours: float,
+    backfill_days: float,
+    regular_window_minutes: float,
 ) -> TimeWindow:
-    earliest = end - timedelta(hours=max_lookback_hours)
-    start = max(last_successful_end, earliest) if last_successful_end else earliest
-    return TimeWindow(start=min(start, end), end=end)
+    regular_window = timedelta(minutes=regular_window_minutes)
+    backfill_window = timedelta(days=1)
+    if not last_successful_end:
+        start = end - timedelta(days=backfill_days)
+        return TimeWindow(start=start, end=min(start + backfill_window, end))
+    last_successful_end = min(last_successful_end, end)
+    regular_cutoff = end - regular_window
+    if last_successful_end < regular_cutoff:
+        daily_end = last_successful_end + backfill_window
+        return TimeWindow(start=last_successful_end, end=daily_end if daily_end < regular_cutoff else end)
+    return TimeWindow(start=max(end - regular_window, last_successful_end), end=end)
 
 
 class Store:
@@ -32,7 +41,8 @@ class Store:
     def next_window(
         self,
         source_id: str,
-        max_lookback_hours: float,
+        backfill_days: float,
+        regular_window_minutes: float,
         now: datetime | None = None,
     ) -> TimeWindow:
         end = now or datetime.now(timezone.utc)
@@ -43,7 +53,7 @@ class Store:
                 (source_id,),
             ).fetchone()
         last_end = row[0] if row else None
-        return calculate_window(end, last_end, max_lookback_hours)
+        return calculate_window(end, last_end, backfill_days, regular_window_minutes)
 
     def begin_source(self, run_id: UUID, source_id: str, source_type: str, window: TimeWindow) -> int:
         with psycopg.connect(self.database_url) as connection:
@@ -57,11 +67,11 @@ class Store:
         with psycopg.connect(self.database_url) as connection:
             row = connection.execute(
                 """INSERT INTO raw_news_items
-                   (source_id,source_type,external_id,url,title,summary,published_at,raw_payload,first_seen_run_id)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
+                   (source_id,source_type,external_id,url,title,summary,body,published_at,raw_payload,first_seen_run_id)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
                    ON CONFLICT(source_id,external_id) DO NOTHING RETURNING id""",
                 (item.source_id, item.source_type, item.external_id, item.url, item.title,
-                 item.summary, item.published_at, json.dumps(item.raw_payload, default=str), run_id),
+                 item.summary, item.body, item.published_at, json.dumps(item.raw_payload, default=str), run_id),
             ).fetchone()
             inserted = row is not None
             item_id = row[0] if row else connection.execute(

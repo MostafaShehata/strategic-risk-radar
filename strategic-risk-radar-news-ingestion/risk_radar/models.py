@@ -26,6 +26,7 @@ class RawItem:
     url: str
     title: str
     summary: str
+    body: str
     published_at: datetime | None
     keyword: str
     raw_payload: dict[str, Any] = field(default_factory=dict)

@@ -132,7 +132,7 @@ def documents(
     limit: int = Query(100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     return query(
-        """SELECT id,source_id,title,url,summary,published_at,first_seen_at,
+        """SELECT id,source_id,title,url,summary,body,published_at,first_seen_at,
                   processing_status,keywords
            FROM v_documents_browse d
            WHERE (%s='' OR source_id=%s)
