@@ -47,36 +47,35 @@ keywords:
 sources:
   - id: gdelt
     type: gdelt
-    enabled: false
+    enabled: true
     url: https://api.gdeltproject.org/api/v2/doc/doc
     max_records: 250
     minimum_request_interval_seconds: 5.2
-    prevent_overlap: true
-    schedule_minutes: 3
+    schedule_minutes: 20
     retry_attempts: 3
 
   - id: guardian
     type: guardian
-    enabled: false
+    enabled: true
     url: https://content.guardianapis.com/search
     api_key_env: GUARDIAN_API_KEY
     api_key: test
-    max_records: 250
-    schedule_minutes: 3
+    max_records: 200
+    schedule_minutes: 20
     retry_attempts: 3
 
   - id: us_state_travel_advisories
     type: state_travel_advisories
     enabled: true
     url: https://travel.state.gov/_res/rss/TAsTWs.xml
-    schedule_minutes: 3
+    schedule_minutes: 20
     retry_attempts: 3
 
   - id: faa_airport_status
     type: faa_airport_status
     enabled: true
     url: https://nasstatus.faa.gov/api/airport-status-information
-    schedule_minutes: 3
+    schedule_minutes: 20
     retry_attempts: 3
 
   - id: wco_customs
@@ -84,5 +83,5 @@ sources:
     enabled: true
     url: https://www.wcoomd.org/en/media/newsroom.aspx
     max_records: 20
-    schedule_minutes: 3
+    schedule_minutes: 20
     retry_attempts: 3
