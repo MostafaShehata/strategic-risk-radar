@@ -1,4 +1,5 @@
 import json
+import os
 
 import httpx
 import trafilatura
@@ -7,7 +8,8 @@ from .schemas import CrawlResponse
 
 
 class ArticleCrawler:
-    def __init__(self, timeout_seconds: float = 45) -> None:
+    def __init__(self, timeout_seconds: float | None = None) -> None:
+        timeout_seconds = timeout_seconds or float(os.environ.get("FIRECRAWLER_TIMEOUT_SECONDS", "5"))
         self.timeout_seconds = timeout_seconds
 
     async def crawl(self, url: str) -> CrawlResponse:

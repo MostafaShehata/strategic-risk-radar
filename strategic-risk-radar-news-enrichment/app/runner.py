@@ -15,7 +15,7 @@ class EnrichmentRunner:
         self.graph = build_graph(
             EnrichmentNodes(
                 repository=self.repository,
-                firecrawler=FirecrawlerClient(settings.firecrawler_url),
+                firecrawler=FirecrawlerClient(settings.firecrawler_url, settings.firecrawler_timeout_seconds),
                 ollama=OllamaClient(
                     settings.model_base_url,
                     settings.model_name,

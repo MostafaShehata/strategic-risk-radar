@@ -200,13 +200,15 @@ class EnrichmentNodes:
     def kpi_impact(self, state: EnrichmentState) -> EnrichmentState:
         text = self.article_text(state)
         impacts = self.rule_kpi_impacts(text.casefold(), state)
-        llm_result = self.topic_ollama.json_task(
-            "You are an ICP strategic risk analyst. Return strict JSON only with key kpi_impacts. "
-            "Each item must contain kpi_name, risk_score 0-100, risk_level low|medium|high|critical, "
-            "impact_summary, evidence, confidence_score. Use only these KPI names: "
-            + ", ".join(ICP_KPIS),
-            text[:6000],
-        )
+        llm_result = {}
+        if self.should_use_topic_llm(state):
+            llm_result = self.topic_ollama.json_task(
+                "You are an ICP strategic risk analyst. Return strict JSON only with key kpi_impacts. "
+                "Each item must contain kpi_name, risk_score 0-100, risk_level low|medium|high|critical, "
+                "impact_summary, evidence, confidence_score. Use only these KPI names: "
+                + ", ".join(ICP_KPIS),
+                text[:6000],
+            )
         for item in llm_result.get("kpi_impacts", []) if isinstance(llm_result.get("kpi_impacts"), list) else []:
             kpi_name = self.normalize_kpi_name(str(item.get("kpi_name", "")))
             if not kpi_name:
@@ -236,10 +238,12 @@ class EnrichmentNodes:
             score = min(score, 35)
         if domains == ["strategic_monitoring"] and not state.get("path_impacts"):
             score = min(score, 25)
-        llm_result = self.topic_ollama.json_task(
-            "Score strategic risk as strict JSON only: {\"risk_score\":0-100,\"risk_level\":\"low|medium|high|critical\",\"risk_domains\":[\"cargo\"],\"risk_reason\":\"...\",\"confidence_score\":0.0}",
-            self.article_text(state)[:5000],
-        )
+        llm_result = {}
+        if self.should_use_topic_llm(state):
+            llm_result = self.topic_ollama.json_task(
+                "Score strategic risk as strict JSON only: {\"risk_score\":0-100,\"risk_level\":\"low|medium|high|critical\",\"risk_domains\":[\"cargo\"],\"risk_reason\":\"...\",\"confidence_score\":0.0}",
+                self.article_text(state)[:5000],
+            )
         score = int(llm_result.get("risk_score", score) or score)
         score = max(0, min(100, score))
         risk_level = str(llm_result.get("risk_level") or self.risk_level(score)).lower()
@@ -406,13 +410,15 @@ class EnrichmentNodes:
 
     def strategic_topic_proposal(self, state: EnrichmentState) -> TopicDecision:
         fallback = self.fallback_topic_proposal(state)
-        llm_result = self.ollama.json_task(
-            "You are an ICP strategic intelligence analyst. Create or classify the strategic situation topic, not the article headline. "
-            "Return strict JSON only with keys: topic_title, topic_key, event_type, summary, uae_impact, affected_kpis array, confidence_score. "
-            "Good topic examples: Iran War Escalation, Strait of Hormuz Blocking Risk, Regional Airspace Closure, Russia Ukraine Migration Pressure. "
-            "topic_key must be lowercase words separated by underscores and stable across similar articles.",
-            self.article_text(state)[:6000],
-        )
+        llm_result = {}
+        if self.should_use_topic_llm(state):
+            llm_result = self.topic_ollama.json_task(
+                "You are an ICP strategic intelligence analyst. Create or classify the strategic situation topic, not the article headline. "
+                "Return strict JSON only with keys: topic_title, topic_key, event_type, summary, uae_impact, affected_kpis array, confidence_score. "
+                "Good topic examples: Iran War Escalation, Strait of Hormuz Blocking Risk, Regional Airspace Closure, Russia Ukraine Migration Pressure. "
+                "topic_key must be lowercase words separated by underscores and stable across similar articles.",
+                self.article_text(state)[:6000],
+            )
         title = str(llm_result.get("topic_title") or fallback.title).strip()
         topic_key = self.normalize_topic_key(str(llm_result.get("topic_key") or title or fallback.topic_key))
         affected_kpis = llm_result.get("affected_kpis") if isinstance(llm_result.get("affected_kpis"), list) else fallback.affected_kpis
@@ -528,6 +534,32 @@ class EnrichmentNodes:
             "port",
         )
         return any(self.has_term(text, term) for term in anchor_terms)
+
+    def should_use_topic_llm(self, state: EnrichmentState) -> bool:
+        if not settings.enable_topic_llm:
+            return False
+        text = self.article_text(state).casefold()
+        if state.get("path_impacts"):
+            return True
+        risk_terms = (
+            "war",
+            "attack",
+            "missile",
+            "sanctions",
+            "ceasefire",
+            "escalation",
+            "closure",
+            "closed",
+            "blocked",
+            "disruption",
+            "delay",
+            "evacuation",
+            "trafficking",
+            "smuggling",
+            "fraud",
+            "overstay",
+        )
+        return self.has_strategic_anchor(text) and any(self.has_term(text, term) for term in risk_terms)
 
     def risk_level(self, score: int) -> str:
         if score >= 75:

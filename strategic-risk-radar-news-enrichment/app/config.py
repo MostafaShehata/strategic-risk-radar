@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     enrichment_interval_seconds: int = 300
     enrichment_batch_size: int = 2
     crawler_min_body_chars: int = 400
+    firecrawler_timeout_seconds: int = 5
     topic_match_threshold: float = 0.90
     enable_llm: bool = False
     enable_topic_llm: bool = True
