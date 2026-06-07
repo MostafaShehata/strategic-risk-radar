@@ -130,11 +130,14 @@ services:
     image: strategic-risk-radar-data-studio-backend:local
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@postgres-db:5432/${POSTGRES_DB:-risk_radar}
+      RAG_API_URL: http://rag-api:8100
     ports:
       - "8000:8000"
     depends_on:
       postgres-db:
         condition: service_healthy
+      rag-api:
+        condition: service_started
 
   data-studio-frontend:
     container_name: strategic-risk-radar-data-studio-frontend

@@ -74,6 +74,56 @@ class QdrantRagStore:
         )
         return [self.to_hit(hit) for hit in hits]
 
+    def status(self) -> dict[str, Any]:
+        self.ensure_collection()
+        client = self.client()
+        collection = client.get_collection(self.collection_name)
+        document_types: dict[str, int] = {}
+        sources: dict[str, int] = {}
+        indexed_articles: set[str] = set()
+        latest_indexed_at = ""
+        next_offset = None
+        scanned = 0
+        while scanned < 5000:
+            points, next_offset = client.scroll(
+                collection_name=self.collection_name,
+                limit=500,
+                offset=next_offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            if not points:
+                break
+            for point in points:
+                payload = point.payload or {}
+                metadata = dict(payload.get("metadata") or {})
+                document_type = str(payload.get("document_type") or "unknown")
+                source = str(payload.get("source") or "unknown")
+                document_types[document_type] = document_types.get(document_type, 0) + 1
+                sources[source] = sources.get(source, 0) + 1
+                article_id = str(metadata.get("enriched_news_item_id") or metadata.get("raw_news_item_id") or "")
+                if article_id:
+                    indexed_articles.add(article_id)
+                indexed_at = str(metadata.get("indexed_at") or metadata.get("created_at") or "")
+                if indexed_at and indexed_at > latest_indexed_at:
+                    latest_indexed_at = indexed_at
+            scanned += len(points)
+            if next_offset is None:
+                break
+        return {
+            "status": "ok",
+            "collection": self.collection_name,
+            "qdrant_url": self.url,
+            "vector_size": self.vector_size,
+            "points_count": collection.points_count or 0,
+            "indexed_article_count": len(indexed_articles),
+            "scanned_points": scanned,
+            "scan_limited": bool(next_offset),
+            "document_types": document_types,
+            "sources": dict(sorted(sources.items(), key=lambda item: item[1], reverse=True)[:10]),
+            "latest_indexed_at": latest_indexed_at,
+        }
+
     def build_filter(self, filters: dict[str, Any]) -> models.Filter | None:
         must = [
             models.FieldCondition(key=f"metadata.{key}", match=models.MatchValue(value=value))

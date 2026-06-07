@@ -1,5 +1,8 @@
 import os
+import json
 from typing import Any
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import psycopg
 from fastapi import FastAPI, Query
@@ -258,6 +261,27 @@ def overview() -> dict[str, Any]:
            FROM enrichment_runs"""
     )[0]
     return {**row, **enrichment}
+
+
+@app.get("/api/rag/status")
+def rag_status() -> dict[str, Any]:
+    rag_api_url = os.environ.get("RAG_API_URL", "http://rag-api:8100").rstrip("/")
+    try:
+        with urlopen(f"{rag_api_url}/api/status", timeout=5) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            return {"reachable": True, **data}
+    except (OSError, URLError, TimeoutError, json.JSONDecodeError) as error:
+        return {
+            "reachable": False,
+            "status": "unavailable",
+            "collection": "",
+            "points_count": 0,
+            "indexed_article_count": 0,
+            "document_types": {},
+            "sources": {},
+            "latest_indexed_at": "",
+            "error": str(error),
+        }
 
 
 @app.get("/api/summary/ingestion")

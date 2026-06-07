@@ -72,6 +72,32 @@ import { bootstrapApplication } from '@angular/platform-browser';
             </tbody>
           </table>
         </section>
+
+        <section class="panel rag-panel">
+          <div class="section-heading">
+            <div><span class="eyebrow dark">RAG STATUS</span><h2>Vector index readiness</h2></div>
+            <span class="badge large" [class.bad]="!ragStatus?.reachable">{{ragStatus?.status || 'loading'}}</span>
+          </div>
+          <div class="summary-strip rag-strip">
+            <span><label>Collection</label><strong class="small-strong">{{ragStatus?.collection || 'not available'}}</strong></span>
+            <span><label>Indexed chunks</label><strong>{{ragStatus?.points_count || 0}}</strong></span>
+            <span><label>Indexed articles</label><strong>{{ragStatus?.indexed_article_count || 0}}</strong></span>
+            <span><label>Scanned chunks</label><strong>{{ragStatus?.scanned_points || 0}}</strong></span>
+          </div>
+          <p class="error" *ngIf="ragStatus && !ragStatus.reachable"><strong>RAG unavailable:</strong><br>{{ragStatus.error}}</p>
+          <div class="rag-lists" *ngIf="ragStatus?.reachable">
+            <div>
+              <h3>Document types</h3>
+              <table><tbody><tr *ngFor="let item of objectEntries(ragStatus.document_types)"><td>{{item.key}}</td><td>{{item.value}}</td></tr></tbody></table>
+            </div>
+            <div>
+              <h3>Top sources</h3>
+              <table><tbody><tr *ngFor="let item of objectEntries(ragStatus.sources)"><td>{{item.key}}</td><td>{{item.value}}</td></tr></tbody></table>
+            </div>
+          </div>
+          <small *ngIf="ragStatus?.latest_indexed_at">Latest indexed at {{ragStatus.latest_indexed_at | date:'medium'}}</small>
+          <small *ngIf="ragStatus?.scan_limited">Showing sampled payload counts because the vector collection is large.</small>
+        </section>
       </section>
 
       <section *ngIf="tab==='Ingestion Execution'" class="run-layout">
@@ -379,6 +405,7 @@ class App implements OnInit {
   overview: any;
   ingestionSummary: any[] = [];
   enrichmentSummary: any[] = [];
+  ragStatus: any;
   runs: any[] = [];
   enrichmentRuns: any[] = [];
   documents: any[] = [];
@@ -421,6 +448,7 @@ class App implements OnInit {
     this.http.get('/api/overview').subscribe(v => this.overview = v);
     this.http.get<any[]>('/api/summary/ingestion').subscribe(v => this.ingestionSummary = v);
     this.http.get<any[]>('/api/summary/enrichment').subscribe(v => this.enrichmentSummary = v);
+    this.http.get<any>('/api/rag/status').subscribe(v => this.ragStatus = v);
     this.http.get<any[]>('/api/source-types').subscribe(v => this.sourceTypes = v.map(x => x.source_type));
     this.http.get<any[]>('/api/document-keywords').subscribe(v => this.keywords = v.map(x => x.keyword));
     this.http.get<any>('/api/enrichment/filter-options').subscribe(v => this.enrichmentOptions = v);
@@ -535,6 +563,10 @@ class App implements OnInit {
 
   shortId(id: string): string {
     return id ? id.slice(0, 8) : '';
+  }
+
+  objectEntries(value: any): {key: string, value: any}[] {
+    return Object.entries(value || {}).map(([key, entryValue]) => ({key, value: entryValue}));
   }
 }
 

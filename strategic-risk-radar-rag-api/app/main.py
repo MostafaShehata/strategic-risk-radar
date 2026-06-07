@@ -24,6 +24,11 @@ def health() -> dict[str, str]:
     return {"status": "ok", "collection": settings.rag_collection_name}
 
 
+@app.get("/api/status")
+def status() -> dict[str, object]:
+    return rag_service.store.status()
+
+
 @app.post("/api/ingest/text", response_model=IngestResponse)
 def ingest_text(request: IngestTextRequest) -> IngestResponse:
     return rag_service.ingest_text(

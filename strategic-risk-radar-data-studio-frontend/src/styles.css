@@ -130,6 +130,20 @@ nav button.active {
   align-items: start;
 }
 
+.rag-panel {
+  grid-column: 1 / -1;
+}
+
+.rag-strip {
+  grid-template-columns: 1.4fr repeat(3, 1fr);
+}
+
+.rag-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .two-column {
   display: grid;
   grid-template-columns: 330px 1fr;
