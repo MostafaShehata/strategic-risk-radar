@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from html import unescape
 import re
 import time
 from collections.abc import Iterable
 from typing import Any
 import xml.etree.ElementTree as ET
+from urllib.parse import urljoin
 
 import feedparser
 import httpx
@@ -172,12 +174,45 @@ class FaaAirportStatusSource(Source):
             yield KeywordResult(keyword.name, 1 if keyword == keywords[0] else 0, len(candidates), tuple(items))
 
 
+class WcoCustomsAnnouncementsSource(Source):
+    source_type = "customs_announcement"
+
+    def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
+        response = self.request("GET", self.config["url"])
+        candidates = [
+            item for item in parse_wco_newsroom(response.text, self.config["url"])
+            if item["published_at"] is None or window.start <= item["published_at"] <= window.end
+        ][:int(self.config.get("max_records", 20))]
+        body_cache: dict[str, str] = {}
+        for keyword in keywords:
+            items = []
+            for candidate in candidates:
+                title = str(candidate["title"])
+                body = body_cache.get(str(candidate["url"]), "")
+                if not body:
+                    try:
+                        detail_response = self.request("GET", str(candidate["url"]))
+                        body = extract_page_body(detail_response.text)
+                        body_cache[str(candidate["url"])] = body
+                    except httpx.HTTPError as exc:
+                        print(f"wco detail fetch failed for {candidate['url']}: {exc}", flush=True)
+                haystack = f"{title} {body}"
+                if any(contains_keyword(haystack, term) for term in keyword.terms):
+                    items.append(RawItem(
+                        self.config["id"], self.source_type,
+                        stable_id(str(candidate["url"]), title),
+                        str(candidate["url"]), title, str(candidate.get("summary") or ""), body,
+                        candidate["published_at"], keyword.name, candidate,
+                    ))
+            yield KeywordResult(keyword.name, 1 if keyword == keywords[0] else 0, len(candidates), tuple(items))
+
+
 def strip_html(value: str) -> str:
     return re.sub(r"<[^>]+>", "", value or "").strip()
 
 
 def clean_text(value: str | None) -> str:
-    return re.sub(r"\s+", " ", value or "").strip()
+    return re.sub(r"\s+", " ", unescape(strip_html(value or ""))).strip()
 
 
 def parse_faa_airport_status(xml_text: str, year: int) -> list[dict[str, Any]]:
@@ -216,12 +251,47 @@ def parse_faa_time(value: str, year: int) -> datetime | None:
         return None
 
 
+def parse_wco_newsroom(html: str, base_url: str) -> list[dict[str, Any]]:
+    news = []
+    pattern = re.compile(
+        r'<li>\s*<div class="dateFields">.*?<p class="news-date date">\s*(?P<date>.*?)\s*</p>'
+        r'.*?<a href=[\'"](?P<href>.*?)[\'"] class="headline">\s*(?P<title>.*?)\s*</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for match in pattern.finditer(html):
+        title = clean_text(match.group("title"))
+        published_at = parse_wco_date(clean_text(match.group("date")))
+        news.append({
+            "title": title,
+            "url": urljoin(base_url, match.group("href")),
+            "summary": "WCO Newsroom",
+            "published_at": published_at,
+        })
+    return news
+
+
+def parse_wco_date(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%d %B %Y").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def extract_page_body(html: str) -> str:
+    match = re.search(r'<div id="contentCol".*?>(?P<body>.*?)<div id="footerWrapper">', html, re.IGNORECASE | re.DOTALL)
+    text = clean_text(match.group("body") if match else html)
+    return text[:20000]
+
+
 SOURCE_TYPES = {
     "gdelt": GdeltSource,
     "guardian": GuardianSource,
     "rss": RssSource,
     "state_travel_advisories": StateTravelAdvisoriesSource,
     "faa_airport_status": FaaAirportStatusSource,
+    "wco_customs_announcements": WcoCustomsAnnouncementsSource,
 }
 
 

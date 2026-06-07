@@ -4,6 +4,10 @@ keywords:
       - military escalation
       - conflict escalation
       - hostilities intensify
+      - armed conflict
+      - civil unrest
+      - do not travel
+      - travel restrictions
   - name: maritime and cargo disruption
     terms:
       - attack on commercial shipping
@@ -15,6 +19,9 @@ keywords:
     terms:
       - airspace closure
       - airport closure
+      - airport closures
+      - AP CLSD
+      - ground delay
       - flight suspension
       - mass flight cancellation
   - name: migration and residency pressure
@@ -29,37 +36,52 @@ keywords:
       - fraudulent passport
       - migrant smuggling
       - human trafficking
+  - name: customs and trade facilitation
+    terms:
+      - customs controls
+      - cargo supply chain
+      - trade facilitation
+      - customs modernization
+      - border coordination
 
 sources:
   - id: gdelt
     type: gdelt
-    enabled: true
+    enabled: false
     url: https://api.gdeltproject.org/api/v2/doc/doc
-    max_records: 50
+    max_records: 150
     minimum_request_interval_seconds: 5.2
-    schedule_minutes: 10
+    schedule_minutes: 3
     retry_attempts: 3
 
   - id: guardian
     type: guardian
-    enabled: true
+    enabled: false
     url: https://content.guardianapis.com/search
     api_key_env: GUARDIAN_API_KEY
     api_key: test
     max_records: 50
-    schedule_minutes: 10
+    schedule_minutes: 3
     retry_attempts: 3
 
   - id: us_state_travel_advisories
     type: state_travel_advisories
     enabled: true
     url: https://travel.state.gov/_res/rss/TAsTWs.xml
-    schedule_minutes: 10
+    schedule_minutes: 3
     retry_attempts: 3
 
   - id: faa_airport_status
     type: faa_airport_status
     enabled: true
     url: https://nasstatus.faa.gov/api/airport-status-information
-    schedule_minutes: 10
+    schedule_minutes: 3
+    retry_attempts: 3
+
+  - id: wco_customs_announcements
+    type: wco_customs_announcements
+    enabled: true
+    url: https://www.wcoomd.org/en/media/newsroom.aspx
+    max_records: 20
+    schedule_minutes: 3
     retry_attempts: 3

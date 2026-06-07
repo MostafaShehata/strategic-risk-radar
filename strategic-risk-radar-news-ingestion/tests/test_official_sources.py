@@ -3,7 +3,13 @@ from datetime import datetime, timezone
 import httpx
 
 from risk_radar.models import KeywordSpec, TimeWindow
-from risk_radar.sources import FaaAirportStatusSource, StateTravelAdvisoriesSource, parse_faa_airport_status
+from risk_radar.sources import (
+    FaaAirportStatusSource,
+    StateTravelAdvisoriesSource,
+    WcoCustomsAnnouncementsSource,
+    parse_faa_airport_status,
+    parse_wco_newsroom,
+)
 
 
 def test_state_travel_advisories_use_government_advisory_source_type():
@@ -87,3 +93,53 @@ def test_faa_source_matches_airport_closure_keywords():
     assert results[0].retrieved_count == 1
     assert len(results[0].items) == 1
     assert results[0].items[0].source_type == "aviation_notice"
+
+
+def test_parse_wco_newsroom_extracts_customs_announcements():
+    html = """
+<li>
+  <div class="dateFields"><p class="news-date date">01 June 2026</p></div>
+  <h3><a href='/en/media/newsroom/2026/june/customs-update.aspx' class="headline">
+    Global Trade Takes a Digital Leap with eATA Rollout in 30 Countries
+  </a></h3>
+</li>
+"""
+
+    news = parse_wco_newsroom(html, "https://www.wcoomd.org/en/media/newsroom.aspx")
+
+    assert news[0]["title"] == "Global Trade Takes a Digital Leap with eATA Rollout in 30 Countries"
+    assert news[0]["url"] == "https://www.wcoomd.org/en/media/newsroom/2026/june/customs-update.aspx"
+    assert news[0]["published_at"] == datetime(2026, 6, 1, tzinfo=timezone.utc)
+
+
+def test_wco_source_matches_customs_keywords_from_detail_body():
+    listing = """
+<li>
+  <div class="dateFields"><p class="news-date date">01 June 2026</p></div>
+  <h3><a href='/en/media/newsroom/2026/june/customs-update.aspx' class="headline">
+    Global Trade Takes a Digital Leap with eATA Rollout in 30 Countries
+  </a></h3>
+</li>
+"""
+    detail = '<div id="contentCol"><p>Customs modernization improves trade facilitation.</p></div><div id="footerWrapper">'
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/newsroom.aspx"):
+            return httpx.Response(200, text=listing)
+        return httpx.Response(200, text=detail)
+
+    source = WcoCustomsAnnouncementsSource(
+        {"id": "wco_customs_announcements", "url": "https://www.wcoomd.org/en/media/newsroom.aspx", "retry_attempts": 1},
+        httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    keyword = KeywordSpec("customs and trade facilitation", ("customs modernization",))
+    window = TimeWindow(
+        datetime(2026, 6, 1, tzinfo=timezone.utc),
+        datetime(2026, 6, 2, tzinfo=timezone.utc),
+    )
+
+    results = list(source.fetch((keyword,), window))
+
+    assert results[0].retrieved_count == 1
+    assert len(results[0].items) == 1
+    assert results[0].items[0].source_type == "customs_announcement"
