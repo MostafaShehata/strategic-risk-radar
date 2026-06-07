@@ -23,9 +23,9 @@ import { bootstrapApplication } from '@angular/platform-browser';
       <section class="cards" *ngIf="overview">
         <article><label>Raw documents</label><strong>{{overview.total_documents}}</strong></article>
         <article><label>Enriched documents</label><strong>{{overview.enriched_documents}}</strong></article>
-        <article><label>Topics</label><strong>{{overview.topics}}</strong></article>
+        <article><label>Strategic topics</label><strong>{{overview.topics}}</strong></article>
+        <article><label>KPI impacts</label><strong>{{overview.kpi_impacts}}</strong></article>
         <article><label>Pending enrichment</label><strong>{{overview.pending_enrichment}}</strong></article>
-        <article class="warning"><label>Running processes</label><strong>{{overview.running_runs + overview.enrichment_running}}</strong></article>
       </section>
 
       <nav>
@@ -132,8 +132,20 @@ import { bootstrapApplication } from '@angular/platform-browser';
       <section class="workspace" *ngIf="tab==='Enriched Intelligence'">
         <section class="panel">
           <div class="section-heading">
-            <div><span class="eyebrow dark">ENRICHED NEWS</span><h2>Risk-scored intelligence</h2></div>
+            <div><span class="eyebrow dark">KPI RISK DASHBOARD</span><h2>UAE operational impact</h2></div>
             <span class="badge large">{{enrichedItems.length}} shown</span>
+          </div>
+          <div class="kpi-grid">
+            <article *ngFor="let kpi of kpis" [class]="riskClass(levelFromScore(kpi.highest_risk_score))">
+              <label>{{kpi.kpi_name}}</label>
+              <strong>{{kpi.highest_risk_score}}</strong>
+              <span>{{kpi.article_count}} linked articles</span>
+              <small>Critical {{kpi.critical_count}} / High {{kpi.high_count}} / Medium {{kpi.medium_count}}</small>
+            </article>
+          </div>
+
+          <div class="section-heading subhead">
+            <div><span class="eyebrow dark">ENRICHED NEWS</span><h2>Risk-scored articles</h2></div>
           </div>
           <div class="filters">
             <input [(ngModel)]="enrichedSearch" (keyup.enter)="loadEnrichedItems()" placeholder="Search title, summary, body">
@@ -204,6 +216,20 @@ import { bootstrapApplication } from '@angular/platform-browser';
           </table>
           <ng-template #noPaths><p class="info">No route/path impact was detected for this article.</p></ng-template>
 
+          <h3>KPI Impact Agent</h3>
+          <table *ngIf="selectedEnrichedItem.kpi_impacts?.length; else noKpis">
+            <thead><tr><th>KPI</th><th>Risk</th><th>Impact</th><th>Evidence</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let k of selectedEnrichedItem.kpi_impacts">
+                <td>{{k.kpi_name}}</td>
+                <td><span class="risk-pill" [ngClass]="riskClass(k.risk_level)">{{k.risk_score}} {{k.risk_level}}</span></td>
+                <td>{{k.impact_summary}}</td>
+                <td>{{k.evidence}}</td>
+              </tr>
+            </tbody>
+          </table>
+          <ng-template #noKpis><p class="info">No KPI impact was detected for this article.</p></ng-template>
+
           <h3>Final Validator</h3>
           <p><span class="badge" [class.bad]="selectedEnrichedItem.item.enrichment_status==='needs_review'">{{selectedEnrichedItem.item.enrichment_status}}</span></p>
         </aside>
@@ -212,7 +238,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
 
       <section class="workspace" *ngIf="tab==='Topics'">
         <section class="panel">
-          <div class="section-heading"><div><span class="eyebrow dark">TOPIC CLUSTERS</span><h2>Grouped events and narratives</h2></div></div>
+          <div class="section-heading"><div><span class="eyebrow dark">STRATEGIC TOPIC BOARD</span><h2>Situations affecting UAE responsibilities</h2></div></div>
           <div class="filters">
             <input [(ngModel)]="topicSearch" (keyup.enter)="loadTopics()" placeholder="Search topics">
             <select [(ngModel)]="topicRiskLevel"><option value="">All risk levels</option><option *ngFor="let r of enrichmentOptions.risk_levels">{{r}}</option></select>
@@ -222,9 +248,9 @@ import { bootstrapApplication } from '@angular/platform-browser';
           <div class="topic-list">
             <button class="topic-card" *ngFor="let topic of topics" [class.selected]="selectedTopic?.topic?.id===topic.id" (click)="selectTopic(topic.id)">
               <div><strong>{{topic.title}}</strong><span class="risk-pill" [ngClass]="riskClass(topic.risk_level)">{{topic.risk_score}} {{topic.risk_level}}</span></div>
-              <small class="mono">Topic {{shortId(topic.id)}} / {{topic.article_count}} articles</small>
-              <p>{{topic.summary || 'Topic created from matching country and domain signature.'}}</p>
-              <div class="chips"><span *ngFor="let d of asList(topic.primary_domains)">{{d}}</span><span *ngFor="let c of asList(topic.primary_countries)">{{c}}</span></div>
+              <small class="mono">Topic {{shortId(topic.id)}} / {{topic.article_count}} articles / {{topic.event_type || 'event'}}</small>
+              <p>{{topic.uae_impact || topic.summary || 'Strategic topic awaiting UAE impact summary.'}}</p>
+              <div class="chips"><span *ngFor="let k of asList(topic.affected_kpis)">{{k}}</span><span *ngFor="let d of asList(topic.primary_domains)">{{d}}</span></div>
             </button>
           </div>
         </section>
@@ -235,12 +261,18 @@ import { bootstrapApplication } from '@angular/platform-browser';
             <span class="badge large">{{selectedTopic.articles.length}} articles</span>
           </div>
           <p>{{selectedTopic.topic.summary || 'No generated summary yet.'}}</p>
+          <div class="uae-impact">
+            <strong>Expected UAE impact</strong>
+            <p>{{selectedTopic.topic.uae_impact || 'No UAE impact summary yet.'}}</p>
+          </div>
           <dl class="meta-grid">
             <div><dt>Topic ID</dt><dd class="mono">{{selectedTopic.topic.id}}</dd></div>
-            <div><dt>Signature</dt><dd>{{selectedTopic.topic.signature || 'No signature'}}</dd></div>
+            <div><dt>Topic key</dt><dd>{{selectedTopic.topic.topic_key || selectedTopic.topic.signature || 'No key'}}</dd></div>
+            <div><dt>Event type</dt><dd>{{selectedTopic.topic.event_type || 'Unknown'}}</dd></div>
             <div><dt>Risk</dt><dd>{{selectedTopic.topic.risk_score}} / {{selectedTopic.topic.risk_level}}</dd></div>
             <div><dt>Status</dt><dd>{{selectedTopic.topic.status}}</dd></div>
           </dl>
+          <div class="chips"><span *ngFor="let k of asList(selectedTopic.topic.affected_kpis)">{{k}}</span></div>
           <table>
             <thead><tr><th>Article</th><th>Risk</th><th>Similarity</th><th>Primary</th></tr></thead>
             <tbody>
@@ -281,6 +313,7 @@ class App implements OnInit {
   documents: any[] = [];
   enrichedItems: any[] = [];
   topics: any[] = [];
+  kpis: any[] = [];
   runDetail: any;
   enrichmentRunDetail: any;
   selectedEnrichedItem: any;
@@ -323,6 +356,7 @@ class App implements OnInit {
     this.loadDocuments();
     this.loadEnrichedItems();
     this.loadTopics();
+    this.loadKpis();
   }
 
   loadRuns() {
@@ -372,6 +406,12 @@ class App implements OnInit {
       this.enrichedItems = v;
       if (v.length && !this.selectedEnrichedItem) this.selectEnrichedItem(v[0].id);
     });
+    this.loadKpis();
+  }
+
+  loadKpis() {
+    const q = new URLSearchParams({source: this.enrichedSource, risk_level: this.riskLevel});
+    this.http.get<any[]>('/api/enrichment/kpis?' + q).subscribe(v => this.kpis = v);
   }
 
   selectEnrichedItem(id: string) {
@@ -413,6 +453,13 @@ class App implements OnInit {
 
   riskClass(level: string): string {
     return 'risk-' + String(level || 'low').toLowerCase();
+  }
+
+  levelFromScore(score: number): string {
+    if (score >= 75) return 'critical';
+    if (score >= 50) return 'high';
+    if (score >= 25) return 'medium';
+    return 'low';
   }
 
   shortId(id: string): string {

@@ -5,7 +5,7 @@ from langdetect import LangDetectException, detect
 
 from .clients import FirecrawlerClient, OllamaClient, RagApiClient
 from .config import settings
-from .models import Entity, EnrichmentState, PathImpact, TopicDecision, empty_entities
+from .models import Entity, EnrichmentState, KpiImpact, PathImpact, TopicDecision, empty_entities
 from .repository import EnrichmentRepository
 
 
@@ -77,6 +77,19 @@ TRANSPORT_TERMS = (
     "smuggling",
 )
 
+ICP_KPIS = (
+    "Airport Operations",
+    "Passenger Flow",
+    "Port Operations",
+    "Cargo Clearance",
+    "Maritime Route Continuity",
+    "Border Security",
+    "Visa and Residency Compliance",
+    "Identity and Document Fraud",
+    "Migration Pressure",
+    "Government Service Continuity",
+)
+
 
 class EnrichmentNodes:
     def __init__(
@@ -84,11 +97,13 @@ class EnrichmentNodes:
         repository: EnrichmentRepository,
         firecrawler: FirecrawlerClient,
         ollama: OllamaClient,
+        topic_ollama: OllamaClient,
         rag: RagApiClient,
     ) -> None:
         self.repository = repository
         self.firecrawler = firecrawler
         self.ollama = ollama
+        self.topic_ollama = topic_ollama
         self.rag = rag
 
     def load_raw_article(self, state: EnrichmentState) -> EnrichmentState:
@@ -182,17 +197,46 @@ class EnrichmentNodes:
                 impacts.append(PathImpact(origin, destination, f"{origin}-{destination}-{level}", impact_type, level, str(item.get("reason", "")), 0.7))
         return {**state, "path_impacts": self.deduplicate_impacts(impacts)}
 
+    def kpi_impact(self, state: EnrichmentState) -> EnrichmentState:
+        text = self.article_text(state)
+        impacts = self.rule_kpi_impacts(text.casefold(), state)
+        llm_result = self.topic_ollama.json_task(
+            "You are an ICP strategic risk analyst. Return strict JSON only with key kpi_impacts. "
+            "Each item must contain kpi_name, risk_score 0-100, risk_level low|medium|high|critical, "
+            "impact_summary, evidence, confidence_score. Use only these KPI names: "
+            + ", ".join(ICP_KPIS),
+            text[:6000],
+        )
+        for item in llm_result.get("kpi_impacts", []) if isinstance(llm_result.get("kpi_impacts"), list) else []:
+            kpi_name = self.normalize_kpi_name(str(item.get("kpi_name", "")))
+            if not kpi_name:
+                continue
+            impacts.append(
+                KpiImpact(
+                    kpi_name=kpi_name,
+                    risk_score=self.clamp_score(item.get("risk_score", 0)),
+                    risk_level=self.normalize_level(str(item.get("risk_level", "")), self.clamp_score(item.get("risk_score", 0))),
+                    impact_summary=str(item.get("impact_summary", ""))[:700],
+                    evidence=str(item.get("evidence", ""))[:500],
+                    confidence_score=self.clamp_confidence(item.get("confidence_score", 0.65)),
+                )
+            )
+        impacts = self.deduplicate_kpi_impacts(impacts)
+        return {**state, "kpi_impacts": impacts}
+
     def risk_scoring(self, state: EnrichmentState) -> EnrichmentState:
         text = self.article_text(state).casefold()
         score = max([value for term, value in RISK_TERMS.items() if self.has_term(text, term)] or [20])
         domains = self.detect_domains(text)
         if state.get("path_impacts"):
             score = max(score, 60)
+        if state.get("kpi_impacts"):
+            score = max(score, max(impact.risk_score for impact in state["kpi_impacts"]))
         if not state.get("path_impacts") and not self.has_strategic_anchor(text):
             score = min(score, 35)
         if domains == ["strategic_monitoring"] and not state.get("path_impacts"):
             score = min(score, 25)
-        llm_result = self.ollama.json_task(
+        llm_result = self.topic_ollama.json_task(
             "Score strategic risk as strict JSON only: {\"risk_score\":0-100,\"risk_level\":\"low|medium|high|critical\",\"risk_domains\":[\"cargo\"],\"risk_reason\":\"...\",\"confidence_score\":0.0}",
             self.article_text(state)[:5000],
         )
@@ -212,13 +256,16 @@ class EnrichmentNodes:
         }
 
     def topic_clustering(self, state: EnrichmentState) -> EnrichmentState:
-        signature = self.repository.topic_signature(state)
-        existing = self.repository.find_topic_by_signature(signature)
+        proposal = self.strategic_topic_proposal(state)
+        existing = self.repository.find_topic_by_key(proposal.topic_key)
         if existing and existing[1] >= settings.topic_match_threshold:
-            decision = TopicDecision(topic_id=existing[0], action="attach", similarity_score=existing[1], llm_match_confidence=0.9)
+            proposal.topic_id = existing[0]
+            proposal.action = "attach"
+            proposal.similarity_score = existing[1]
+            proposal.llm_match_confidence = max(proposal.llm_match_confidence, 0.9)
         else:
-            decision = TopicDecision(action="create", similarity_score=0, llm_match_confidence=0)
-        return {**state, "topic": decision}
+            proposal.action = "create"
+        return {**state, "topic": proposal}
 
     def final_validator(self, state: EnrichmentState) -> EnrichmentState:
         errors = []
@@ -321,6 +368,129 @@ class EnrichmentNodes:
             seen.add(impact.path_code)
             result.append(impact)
         return result
+
+    def rule_kpi_impacts(self, text: str, state: EnrichmentState) -> list[KpiImpact]:
+        impacts: list[KpiImpact] = []
+        def add(kpi: str, score: int, summary: str, evidence: str) -> None:
+            impacts.append(KpiImpact(kpi, score, self.risk_level(score), summary, evidence, 0.7))
+
+        if any(self.has_term(text, term) for term in ("airport", "airspace", "flight", "airline", "passenger")):
+            add("Airport Operations", 55, "Potential effect on flight schedules, airspace availability, or airport operations.", "Aviation terms detected in article.")
+            add("Passenger Flow", 50, "Potential passenger flow disruption or travel demand change.", "Passenger or flight terms detected.")
+        if any(self.has_term(text, term) for term in ("port", "shipping", "vessel", "cargo", "hormuz", "suez")):
+            add("Port Operations", 65, "Potential effect on port throughput, vessel movement, or maritime operations.", "Maritime or port terms detected.")
+            add("Cargo Clearance", 60, "Potential cargo inspection, clearance, or routing pressure.", "Cargo or customs-adjacent terms detected.")
+            add("Maritime Route Continuity", 70 if "hormuz" in text or "suez" in text else 55, "Potential disruption to strategic sea routes affecting UAE trade routes.", "Chokepoint or maritime routing terms detected.")
+        if any(self.has_term(text, term) for term in ("border", "passport", "trafficking", "smuggling", "fraud")):
+            add("Border Security", 65, "Potential increase in border screening or interdiction pressure.", "Border security terms detected.")
+            add("Identity and Document Fraud", 55, "Potential identity, passport, or document-fraud exposure.", "Identity or document-risk terms detected.")
+        if any(self.has_term(text, term) for term in ("visa", "residency", "overstay")):
+            add("Visa and Residency Compliance", 55, "Potential compliance pressure from visa, residency, or overstay signals.", "Visa or residency terms detected.")
+        if any(self.has_term(text, term) for term in ("migration", "refugee", "displacement", "evacuation")):
+            add("Migration Pressure", 65, "Potential inbound or transit migration pressure affecting UAE readiness.", "Migration or displacement terms detected.")
+        if any(self.has_term(text, term) for term in ("war", "attack", "missile", "sanctions", "closure", "blocked", "disruption")):
+            add("Government Service Continuity", 50, "Potential need for cross-agency monitoring and service continuity planning.", "Escalation or disruption terms detected.")
+        if state.get("path_impacts"):
+            add("Government Service Continuity", 65, "Route impact detected; decision makers may need coordinated monitoring.", "Path Impact Agent created route risk.")
+        return impacts or [KpiImpact("Government Service Continuity", 20, "low", "Article retained for monitoring but no direct ICP KPI impact was detected.", "No direct operational KPI terms detected.", 0.55)]
+
+    def deduplicate_kpi_impacts(self, impacts: list[KpiImpact]) -> list[KpiImpact]:
+        best: dict[str, KpiImpact] = {}
+        for impact in impacts:
+            current = best.get(impact.kpi_name)
+            if not current or impact.risk_score > current.risk_score:
+                impact.risk_score = self.clamp_score(impact.risk_score)
+                impact.risk_level = self.risk_level(impact.risk_score)
+                best[impact.kpi_name] = impact
+        return sorted(best.values(), key=lambda item: item.risk_score, reverse=True)
+
+    def strategic_topic_proposal(self, state: EnrichmentState) -> TopicDecision:
+        fallback = self.fallback_topic_proposal(state)
+        llm_result = self.ollama.json_task(
+            "You are an ICP strategic intelligence analyst. Create or classify the strategic situation topic, not the article headline. "
+            "Return strict JSON only with keys: topic_title, topic_key, event_type, summary, uae_impact, affected_kpis array, confidence_score. "
+            "Good topic examples: Iran War Escalation, Strait of Hormuz Blocking Risk, Regional Airspace Closure, Russia Ukraine Migration Pressure. "
+            "topic_key must be lowercase words separated by underscores and stable across similar articles.",
+            self.article_text(state)[:6000],
+        )
+        title = str(llm_result.get("topic_title") or fallback.title).strip()
+        topic_key = self.normalize_topic_key(str(llm_result.get("topic_key") or title or fallback.topic_key))
+        affected_kpis = llm_result.get("affected_kpis") if isinstance(llm_result.get("affected_kpis"), list) else fallback.affected_kpis
+        return TopicDecision(
+            action="create",
+            topic_key=topic_key or fallback.topic_key,
+            title=title or fallback.title,
+            summary=str(llm_result.get("summary") or fallback.summary).strip()[:1000],
+            event_type=str(llm_result.get("event_type") or fallback.event_type).strip()[:120],
+            uae_impact=str(llm_result.get("uae_impact") or fallback.uae_impact).strip()[:1200],
+            affected_kpis=[self.normalize_kpi_name(str(kpi)) or str(kpi) for kpi in affected_kpis][:8],
+            llm_match_confidence=self.clamp_confidence(llm_result.get("confidence_score", fallback.llm_match_confidence)),
+        )
+
+    def fallback_topic_proposal(self, state: EnrichmentState) -> TopicDecision:
+        text = self.article_text(state).casefold()
+        countries = [entity.normalized_name or entity.name for entity in state.get("entities", {}).get("countries", [])]
+        kpis = [impact.kpi_name for impact in state.get("kpi_impacts", [])[:5]]
+        if "hormuz" in text:
+            title, key, event = "Strait of Hormuz Blocking Risk", "strait_of_hormuz_blocking_risk", "maritime_chokepoint_disruption"
+        elif "suez" in text:
+            title, key, event = "Suez Canal Shipping Disruption", "suez_canal_shipping_disruption", "maritime_chokepoint_disruption"
+        elif "iran" in text and any(term in text for term in ("war", "missile", "attack", "ceasefire", "escalation")):
+            title, key, event = "Iran War Escalation", "iran_war_escalation", "regional_conflict"
+        elif "airspace" in text or "flight" in text or "airport" in text:
+            title, key, event = "Regional Airspace and Airport Disruption", "regional_airspace_airport_disruption", "aviation_disruption"
+        elif any(term in text for term in ("migration", "refugee", "displacement")):
+            title, key, event = "Conflict Driven Migration Pressure", "conflict_driven_migration_pressure", "migration_pressure"
+        elif any(term in text for term in ("visa", "residency", "overstay")):
+            title, key, event = "Visa and Residency Compliance Pressure", "visa_residency_compliance_pressure", "visa_residency_pressure"
+        elif countries:
+            title = f"{countries[0]} Strategic Monitoring"
+            key = self.normalize_topic_key(title)
+            event = "strategic_monitoring"
+        else:
+            title, key, event = "General Strategic Monitoring", "general_strategic_monitoring", "strategic_monitoring"
+        return TopicDecision(
+            action="create",
+            topic_key=key,
+            title=title,
+            summary=state.get("summary", "")[:700],
+            event_type=event,
+            uae_impact=self.default_uae_impact(state, kpis),
+            affected_kpis=kpis or ["Government Service Continuity"],
+            llm_match_confidence=0.55,
+        )
+
+    def default_uae_impact(self, state: EnrichmentState, kpis: list[str]) -> str:
+        if kpis:
+            return "Potential UAE impact across " + ", ".join(kpis[:4]) + ". Monitor related news for escalation and operational changes."
+        return "No direct UAE operational impact was detected yet; keep for strategic monitoring."
+
+    def normalize_topic_key(self, value: str) -> str:
+        key = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+        return key[:120] or "general_strategic_monitoring"
+
+    def normalize_kpi_name(self, value: str) -> str:
+        normalized = re.sub(r"\s+", " ", value).strip().casefold()
+        for kpi in ICP_KPIS:
+            if normalized == kpi.casefold():
+                return kpi
+        return ""
+
+    def clamp_score(self, value) -> int:
+        try:
+            return max(0, min(100, int(float(value))))
+        except (TypeError, ValueError):
+            return 0
+
+    def clamp_confidence(self, value) -> float:
+        try:
+            return max(0, min(1, float(value)))
+        except (TypeError, ValueError):
+            return 0.6
+
+    def normalize_level(self, level: str, score: int) -> str:
+        level = level.casefold().strip()
+        return level if level in {"low", "medium", "high", "critical"} else self.risk_level(score)
 
     def detect_domains(self, text: str) -> list[str]:
         domains = []

@@ -5,7 +5,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
-from .models import EnrichmentState, Entity, PathImpact, RawArticle
+from .models import EnrichmentState, Entity, KpiImpact, PathImpact, RawArticle
 
 
 class EnrichmentRepository:
@@ -155,8 +155,10 @@ class EnrichmentRepository:
             ).fetchone()[0]
             connection.execute("DELETE FROM news_entities WHERE enriched_news_item_id=%s", (enriched_id,))
             connection.execute("DELETE FROM news_path_impacts WHERE enriched_news_item_id=%s", (enriched_id,))
+            connection.execute("DELETE FROM news_kpi_impacts WHERE enriched_news_item_id=%s", (enriched_id,))
             self.insert_entities(connection, enriched_id, state)
             self.insert_path_impacts(connection, enriched_id, state.get("path_impacts", []))
+            self.insert_kpi_impacts(connection, enriched_id, state.get("kpi_impacts", []))
             self.save_topic_link(connection, enriched_id, state)
             connection.execute(
                 """UPDATE raw_news_items
@@ -218,23 +220,68 @@ class EnrichmentRepository:
                 ),
             )
 
+    def insert_kpi_impacts(self, connection, enriched_id: UUID, impacts: list[KpiImpact]) -> None:
+        for impact in impacts:
+            connection.execute(
+                """INSERT INTO news_kpi_impacts
+                   (enriched_news_item_id,kpi_name,risk_score,risk_level,impact_summary,evidence,confidence_score)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                (
+                    enriched_id,
+                    impact.kpi_name,
+                    impact.risk_score,
+                    impact.risk_level,
+                    impact.impact_summary,
+                    impact.evidence,
+                    impact.confidence_score,
+                ),
+            )
+
     def save_topic_link(self, connection, enriched_id: UUID, state: EnrichmentState) -> None:
         topic = state.get("topic")
         if not topic:
             return
+        affected_kpis = json.dumps(topic.affected_kpis or [impact.kpi_name for impact in state.get("kpi_impacts", [])])
         topic_id = topic.topic_id or connection.execute(
-            """INSERT INTO topics(title,summary,risk_score,risk_level,primary_countries,primary_domains,signature)
-               VALUES (%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s) RETURNING id""",
+            """INSERT INTO topics(title,summary,risk_score,risk_level,topic_key,event_type,uae_impact,
+                                  primary_countries,primary_domains,affected_kpis,signature)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s) RETURNING id""",
             (
-                state.get("title", "Untitled topic"),
-                state.get("summary", ""),
+                topic.title or state.get("title", "Untitled strategic topic"),
+                topic.summary or state.get("summary", ""),
                 state.get("risk_score", 0),
                 state.get("risk_level", "low"),
+                topic.topic_key,
+                topic.event_type,
+                topic.uae_impact,
                 self.entity_names(state, "countries"),
                 json.dumps(state.get("risk_domains", [])),
-                self.topic_signature(state),
+                affected_kpis,
+                topic.topic_key or self.topic_signature(state),
             ),
         ).fetchone()[0]
+        if topic.topic_id:
+            connection.execute(
+                """UPDATE topics
+                   SET risk_score=GREATEST(risk_score,%s),
+                       risk_level=%s,
+                       summary=CASE WHEN length(summary) < length(%s) THEN %s ELSE summary END,
+                       uae_impact=CASE WHEN length(uae_impact) < length(%s) THEN %s ELSE uae_impact END,
+                       affected_kpis=(SELECT jsonb_agg(DISTINCT value)
+                                      FROM jsonb_array_elements_text(affected_kpis || %s::jsonb) AS value),
+                       updated_at=now()
+                   WHERE id=%s""",
+                (
+                    state.get("risk_score", 0),
+                    state.get("risk_level", "low"),
+                    topic.summary,
+                    topic.summary,
+                    topic.uae_impact,
+                    topic.uae_impact,
+                    affected_kpis,
+                    topic.topic_id,
+                ),
+            )
         connection.execute(
             """INSERT INTO topic_articles
                (topic_id,enriched_news_item_id,similarity_score,llm_match_confidence,is_primary_article)
@@ -243,12 +290,17 @@ class EnrichmentRepository:
         )
 
     def find_topic_by_signature(self, signature: str) -> tuple[str, float] | None:
-        if not signature:
+        return self.find_topic_by_key(signature)
+
+    def find_topic_by_key(self, topic_key: str) -> tuple[str, float] | None:
+        if not topic_key:
             return None
         with psycopg.connect(self.database_url) as connection:
             row = connection.execute(
-                "SELECT id FROM topics WHERE signature=%s ORDER BY updated_at DESC LIMIT 1",
-                (signature,),
+                """SELECT id FROM topics
+                   WHERE topic_key=%s OR signature=%s
+                   ORDER BY updated_at DESC LIMIT 1""",
+                (topic_key, topic_key),
             ).fetchone()
         return (str(row[0]), 0.95) if row else None
 

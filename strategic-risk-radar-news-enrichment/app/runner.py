@@ -23,6 +23,13 @@ class EnrichmentRunner:
                     settings.model_request_timeout_seconds,
                     settings.model_num_predict,
                 ),
+                topic_ollama=OllamaClient(
+                    settings.model_base_url,
+                    settings.model_name,
+                    settings.enable_topic_llm,
+                    settings.model_request_timeout_seconds,
+                    settings.model_num_predict,
+                ),
                 rag=RagApiClient(settings.rag_api_url, settings.enable_rag_indexing),
             )
         )

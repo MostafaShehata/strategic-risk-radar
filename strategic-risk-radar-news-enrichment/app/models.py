@@ -39,11 +39,27 @@ class PathImpact:
 
 
 @dataclass
+class KpiImpact:
+    kpi_name: str
+    risk_score: int
+    risk_level: str
+    impact_summary: str
+    evidence: str = ""
+    confidence_score: float = 0.6
+
+
+@dataclass
 class TopicDecision:
     topic_id: str | None = None
     action: str = "create"
     similarity_score: float = 0.0
     llm_match_confidence: float = 0.0
+    topic_key: str = ""
+    title: str = ""
+    summary: str = ""
+    event_type: str = ""
+    uae_impact: str = ""
+    affected_kpis: list[str] = field(default_factory=list)
 
 
 class EnrichmentState(TypedDict, total=False):
@@ -60,6 +76,7 @@ class EnrichmentState(TypedDict, total=False):
     content_fetch_error: str | None
     entities: dict[str, list[Entity]]
     path_impacts: list[PathImpact]
+    kpi_impacts: list[KpiImpact]
     risk_score: int
     risk_level: str
     risk_domains: list[str]

@@ -177,6 +177,18 @@ CREATE TABLE IF NOT EXISTS news_path_impacts (
     confidence_score NUMERIC(5,4) NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS news_kpi_impacts (
+    id BIGSERIAL PRIMARY KEY,
+    enriched_news_item_id UUID NOT NULL REFERENCES enriched_news_items(id) ON DELETE CASCADE,
+    kpi_name TEXT NOT NULL,
+    risk_score INTEGER NOT NULL DEFAULT 0,
+    risk_level TEXT NOT NULL DEFAULT 'low',
+    impact_summary TEXT NOT NULL DEFAULT '',
+    evidence TEXT NOT NULL DEFAULT '',
+    confidence_score NUMERIC(5,4) NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS topics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
@@ -184,12 +196,21 @@ CREATE TABLE IF NOT EXISTS topics (
     status TEXT NOT NULL DEFAULT 'open',
     risk_score INTEGER NOT NULL DEFAULT 0,
     risk_level TEXT NOT NULL DEFAULT 'low',
+    topic_key TEXT NOT NULL DEFAULT '',
+    event_type TEXT NOT NULL DEFAULT '',
+    uae_impact TEXT NOT NULL DEFAULT '',
     primary_countries JSONB NOT NULL DEFAULT '[]'::jsonb,
     primary_domains JSONB NOT NULL DEFAULT '[]'::jsonb,
+    affected_kpis JSONB NOT NULL DEFAULT '[]'::jsonb,
     signature TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS topic_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT '';
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS uae_impact TEXT NOT NULL DEFAULT '';
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS affected_kpis JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS topic_articles (
     topic_id UUID NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
@@ -205,7 +226,10 @@ CREATE INDEX IF NOT EXISTS enriched_news_items_status_idx ON enriched_news_items
 CREATE INDEX IF NOT EXISTS enriched_news_items_raw_idx ON enriched_news_items(raw_news_item_id);
 CREATE INDEX IF NOT EXISTS news_entities_item_type_idx ON news_entities(enriched_news_item_id, entity_type);
 CREATE INDEX IF NOT EXISTS news_path_impacts_item_idx ON news_path_impacts(enriched_news_item_id);
+CREATE INDEX IF NOT EXISTS news_kpi_impacts_item_idx ON news_kpi_impacts(enriched_news_item_id);
+CREATE INDEX IF NOT EXISTS news_kpi_impacts_kpi_idx ON news_kpi_impacts(kpi_name, risk_level);
 CREATE INDEX IF NOT EXISTS topics_signature_idx ON topics(signature);
+CREATE INDEX IF NOT EXISTS topics_topic_key_idx ON topics(topic_key);
 
 CREATE OR REPLACE VIEW v_run_summary AS
 SELECT r.*, count(s.id) AS source_count

@@ -51,6 +51,7 @@ def overview() -> dict[str, Any]:
                   coalesce(sum(failed_count),0) AS enrichment_failed,
                   (SELECT count(*) FROM enriched_news_items) AS enriched_documents,
                   (SELECT count(*) FROM topics) AS topics,
+                  (SELECT count(*) FROM news_kpi_impacts) AS kpi_impacts,
                   (SELECT count(*) FROM raw_news_items WHERE processing_status='pending') AS pending_enrichment
            FROM enrichment_runs"""
     )[0]
@@ -189,6 +190,7 @@ def enrichment_overview() -> dict[str, Any]:
         """SELECT (SELECT count(*) FROM enriched_news_items) AS enriched_documents,
                   (SELECT count(*) FROM enriched_news_items WHERE enrichment_status='needs_review') AS needs_review,
                   (SELECT count(*) FROM topics) AS topics,
+                  (SELECT count(*) FROM news_kpi_impacts) AS kpi_impacts,
                   (SELECT count(*) FROM news_path_impacts) AS path_impacts,
                   (SELECT count(*) FROM raw_news_items WHERE processing_status='pending') AS pending_documents,
                   (SELECT count(*) FROM raw_news_items WHERE processing_status='enriching') AS enriching_documents,
@@ -259,6 +261,7 @@ def enriched_items(
                   t.id AS topic_id,t.title AS topic_title,
                   coalesce(pi.path_count,0) AS path_impact_count,
                   coalesce(ne.entity_count,0) AS entity_count,
+                  coalesce(ki.kpi_count,0) AS kpi_impact_count,
                   string_agg(DISTINCT k.keyword, ', ' ORDER BY k.keyword) AS keywords
            FROM enriched_news_items e
            JOIN raw_news_items n ON n.id=e.raw_news_item_id
@@ -271,6 +274,9 @@ def enriched_items(
            LEFT JOIN LATERAL (
                SELECT count(*) AS entity_count FROM news_entities ent WHERE ent.enriched_news_item_id=e.id
            ) ne ON true
+           LEFT JOIN LATERAL (
+               SELECT count(*) AS kpi_count FROM news_kpi_impacts kpi WHERE kpi.enriched_news_item_id=e.id
+           ) ki ON true
            WHERE e.risk_score >= %s
              AND (%s='' OR e.source_id=%s)
              AND (%s='' OR e.risk_level=%s)
@@ -284,7 +290,7 @@ def enriched_items(
              AND (%s='' OR e.title ILIKE '%%'||%s||'%%'
                   OR e.summary ILIKE '%%'||%s||'%%'
                   OR e.normalized_body ILIKE '%%'||%s||'%%')
-           GROUP BY e.id,n.url,t.id,pi.path_count,ne.entity_count
+           GROUP BY e.id,n.url,t.id,pi.path_count,ne.entity_count,ki.kpi_count
            ORDER BY e.risk_score DESC, coalesce(e.publication_date,e.created_at) DESC
            LIMIT %s""",
         (
@@ -328,6 +334,12 @@ def enriched_item_detail(item_id: str) -> dict[str, Any]:
            ORDER BY impact_level,path_code""",
         (item_id,),
     )
+    kpis = query(
+        """SELECT kpi_name,risk_score,risk_level,impact_summary,evidence,confidence_score
+           FROM news_kpi_impacts WHERE enriched_news_item_id=%s
+           ORDER BY risk_score DESC,kpi_name""",
+        (item_id,),
+    )
     fetches = query(
         """SELECT url,status,fetcher,title,language,published_at,error_message,created_at,
                   length(body) AS body_length
@@ -340,6 +352,7 @@ def enriched_item_detail(item_id: str) -> dict[str, Any]:
         "item": item_rows[0] if item_rows else None,
         "entities": entities,
         "path_impacts": paths,
+        "kpi_impacts": kpis,
         "content_fetches": fetches,
     }
 
@@ -352,15 +365,17 @@ def topics(
     limit: int = Query(100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     return query(
-        """SELECT t.id,t.title,t.summary,t.status,t.risk_score,t.risk_level,
-                  t.primary_countries,t.primary_domains,t.signature,t.created_at,t.updated_at,
+        """SELECT t.id,t.title,t.summary,t.status,t.risk_score,t.risk_level,t.topic_key,
+                  t.event_type,t.uae_impact,t.primary_countries,t.primary_domains,t.affected_kpis,
+                  t.signature,t.created_at,t.updated_at,
                   count(ta.enriched_news_item_id) AS article_count,
                   max(e.created_at) AS latest_article_at,
                   coalesce(max(e.risk_score), t.risk_score) AS highest_article_risk
            FROM topics t
            LEFT JOIN topic_articles ta ON ta.topic_id=t.id
            LEFT JOIN enriched_news_items e ON e.id=ta.enriched_news_item_id
-           WHERE (%s='' OR t.risk_level=%s)
+           WHERE t.topic_key <> ''
+             AND (%s='' OR t.risk_level=%s)
              AND (%s='' OR t.primary_domains ? %s)
              AND (%s='' OR t.title ILIKE '%%'||%s||'%%' OR t.summary ILIKE '%%'||%s||'%%')
            GROUP BY t.id
@@ -373,8 +388,8 @@ def topics(
 @app.get("/api/enrichment/topics/{topic_id}")
 def topic_detail(topic_id: str) -> dict[str, Any]:
     topic_rows = query(
-        """SELECT id,title,summary,status,risk_score,risk_level,primary_countries,
-                  primary_domains,signature,created_at,updated_at
+        """SELECT id,title,summary,status,risk_score,risk_level,topic_key,event_type,
+                  uae_impact,primary_countries,primary_domains,affected_kpis,signature,created_at,updated_at
            FROM topics WHERE id=%s""",
         (topic_id,),
     )
@@ -389,6 +404,34 @@ def topic_detail(topic_id: str) -> dict[str, Any]:
         (topic_id,),
     )
     return {"topic": topic_rows[0] if topic_rows else None, "articles": articles}
+
+
+@app.get("/api/enrichment/kpis")
+def kpi_dashboard(
+    source: str = "",
+    topic_id: str = "",
+    risk_level: str = "",
+) -> list[dict[str, Any]]:
+    return query(
+        """SELECT k.kpi_name,
+                  count(*) AS article_count,
+                  round(avg(k.risk_score),1) AS average_risk_score,
+                  max(k.risk_score) AS highest_risk_score,
+                  count(*) FILTER (WHERE k.risk_level='critical') AS critical_count,
+                  count(*) FILTER (WHERE k.risk_level='high') AS high_count,
+                  count(*) FILTER (WHERE k.risk_level='medium') AS medium_count,
+                  count(*) FILTER (WHERE k.risk_level='low') AS low_count,
+                  max(e.created_at) AS latest_article_at
+           FROM news_kpi_impacts k
+           JOIN enriched_news_items e ON e.id=k.enriched_news_item_id
+           LEFT JOIN topic_articles ta ON ta.enriched_news_item_id=e.id
+           WHERE (%s='' OR e.source_id=%s)
+             AND (%s='' OR ta.topic_id::text=%s)
+             AND (%s='' OR k.risk_level=%s)
+           GROUP BY k.kpi_name
+           ORDER BY highest_risk_score DESC, article_count DESC,k.kpi_name""",
+        (source, source, topic_id, topic_id, risk_level, risk_level),
+    )
 
 
 @app.get("/api/enrichment/filter-options")
