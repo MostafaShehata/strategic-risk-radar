@@ -1,3 +1,4 @@
+from ..domain_config import business_context, kpi_catalog_text
 from ..models import EnrichmentState
 from .base import BaseAgent
 
@@ -8,6 +9,7 @@ class RiskScoringAgent(BaseAgent):
             "You are an ICP strategic risk scoring agent. Score the article for UAE ICP decision makers. "
             "Return strict JSON only: {\"risk_score\":0-100,\"risk_level\":\"low|medium|high|critical\","
             "\"risk_domains\":[\"domain\"],\"risk_reason\":\"...\",\"confidence_score\":0.0}. "
+            f"Business context: {business_context()}. KPI catalog: {kpi_catalog_text()}. "
             "Base the score only on the article, extracted entities, path impacts, and KPI impacts.",
             self.article_text(state)[:5000],
         )

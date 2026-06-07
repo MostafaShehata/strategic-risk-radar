@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     model_request_timeout_seconds: int = 90
     model_num_predict: int = 350
     claim_timeout_seconds: int = 1800
+    enrichment_config_path: str = "app/enrichment_config.json"
 
 
 settings = Settings()

@@ -1,4 +1,5 @@
 from ..config import settings
+from ..domain_config import business_context, kpi_catalog_text
 from ..models import EnrichmentState, TopicDecision
 from .base import BaseAgent
 
@@ -23,6 +24,7 @@ class TopicClusteringAgent(BaseAgent):
             "You are an ICP strategic intelligence analyst. Create or classify the strategic situation topic, not the article headline. "
             "Return strict JSON only with keys: topic_title, topic_key, event_type, summary, uae_impact, affected_kpis array, confidence_score. "
             "The topic must be a strategic situation useful for UAE decision makers. Do not use the article title as the topic unless it is already a strategic event. "
+            f"Business context: {business_context()}. KPI catalog: {kpi_catalog_text()}. "
             "topic_key must be lowercase words separated by underscores and stable across similar articles. "
             "Return empty strings and an empty affected_kpis array only if no strategic topic can be supported by the article.",
             self.article_text(state)[:6000],

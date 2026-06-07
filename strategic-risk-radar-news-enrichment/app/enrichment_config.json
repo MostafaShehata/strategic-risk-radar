@@ -1,0 +1,15 @@
+{
+  "business_context": "UAE identity, citizenship, ports, cargo, border security, visas, passenger movement, residency compliance, government service continuity, and decision-maker situational awareness",
+  "kpi_catalog": [
+    "Airport Operations",
+    "Passenger Flow",
+    "Port Operations",
+    "Cargo Clearance",
+    "Maritime Route Continuity",
+    "Border Security",
+    "Visa and Residency Compliance",
+    "Identity and Document Fraud",
+    "Migration Pressure",
+    "Government Service Continuity"
+  ]
+}

@@ -75,6 +75,7 @@ services:
       MODEL_NUM_PREDICT: ${MODEL_NUM_PREDICT:-120}
       CLAIM_TIMEOUT_SECONDS: ${CLAIM_TIMEOUT_SECONDS:-1800}
       ENABLE_TOPIC_LLM: ${ENABLE_TOPIC_LLM:-true}
+      ENRICHMENT_CONFIG_PATH: ${ENRICHMENT_CONFIG_PATH:-app/enrichment_config.json}
     depends_on:
       postgres-db:
         condition: service_healthy
