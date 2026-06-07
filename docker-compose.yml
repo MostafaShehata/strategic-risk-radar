@@ -45,6 +45,42 @@ services:
     depends_on:
       - vector-db
 
+  firecrawler:
+    container_name: strategic-risk-radar-firecrawler
+    build: ./strategic-risk-radar-firecrawler
+    image: strategic-risk-radar-firecrawler:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FIRECRAWLER_PORT:-8300}:8300"
+
+  news-enrichment:
+    container_name: strategic-risk-radar-news-enrichment
+    build: ./strategic-risk-radar-news-enrichment
+    image: strategic-risk-radar-news-enrichment:local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
+      FIRECRAWLER_URL: http://firecrawler:8300
+      RAG_API_URL: http://rag-api:8100
+      MODEL_BASE_URL: http://model:11434
+      MODEL_NAME: deepseek-r1:1.5b
+      ENRICHMENT_INTERVAL_SECONDS: ${ENRICHMENT_INTERVAL_SECONDS:-300}
+      ENRICHMENT_BATCH_SIZE: ${ENRICHMENT_BATCH_SIZE:-2}
+      ENABLE_LLM: ${ENABLE_LLM:-false}
+      ENABLE_RAG_INDEXING: ${ENABLE_RAG_INDEXING:-true}
+      MODEL_REQUEST_TIMEOUT_SECONDS: ${MODEL_REQUEST_TIMEOUT_SECONDS:-90}
+      MODEL_NUM_PREDICT: ${MODEL_NUM_PREDICT:-350}
+      CLAIM_TIMEOUT_SECONDS: ${CLAIM_TIMEOUT_SECONDS:-1800}
+    depends_on:
+      db:
+        condition: service_healthy
+      firecrawler:
+        condition: service_started
+      rag-api:
+        condition: service_started
+      model:
+        condition: service_healthy
+
   db:
     container_name: strategic-risk-radar-db
     build: ./strategic-risk-radar-db
