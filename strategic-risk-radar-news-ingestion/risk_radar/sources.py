@@ -71,7 +71,7 @@ class GdeltSource(Source):
             items = tuple(RawItem(
                 self.config["id"], "api", stable_id(a.get("url", ""), a.get("title", "")),
                 a.get("url", ""), a.get("title", ""), a.get("seendate", ""),
-                a.get("seendate", ""),
+                "",
                 parse_datetime(a.get("seendate")), keyword.name, a,
             ) for a in articles)
             yield KeywordResult(keyword.name, 1, len(articles), items)
