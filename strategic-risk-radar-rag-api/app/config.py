@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    qdrant_url: str = "http://strategic-risk-radar-vectordb:6333"
+    qdrant_url: str = "http://qdrant-vector-db:6333"
     rag_collection_name: str = "strategic_risk_radar_docs"
     embedding_model_name: str = "BAAI/bge-small-en-v1.5"
     rag_vector_size: int = 384

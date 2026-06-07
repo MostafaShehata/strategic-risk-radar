@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     database_url: str
     firecrawler_url: str = "http://firecrawler:8300"
     rag_api_url: str = "http://rag-api:8100"
-    model_base_url: str = "http://model:11434"
+    model_base_url: str = "http://ollama-model:11434"
     model_name: str = "deepseek-r1:1.5b"
     enrichment_interval_seconds: int = 300
     enrichment_batch_size: int = 2

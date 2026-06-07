@@ -1,5 +1,5 @@
 param(
-    [string]$ImageName = "strategic-risk-radar-model:local"
+    [string]$ImageName = "strategic-risk-radar-qdrant-vector-db:local"
 )
 
 Push-Location $PSScriptRoot

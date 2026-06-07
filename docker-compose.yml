@@ -1,8 +1,8 @@
 services:
-  model:
-    container_name: strategic-risk-radar-model
-    build: ./strategic-risk-radar-model
-    image: strategic-risk-radar-model:local
+  ollama-model:
+    container_name: strategic-risk-radar-ollama-model
+    build: ./strategic-risk-radar-ollama-model
+    image: strategic-risk-radar-ollama-model:local
     restart: unless-stopped
     environment:
       OLLAMA_MODEL: deepseek-r1:1.5b
@@ -18,10 +18,10 @@ services:
       retries: 20
       start_period: 60s
 
-  vector-db:
-    container_name: strategic-risk-radar-vectordb
-    build: ./strategic-risk-radar-vectordb
-    image: strategic-risk-radar-vectordb:local
+  qdrant-vector-db:
+    container_name: strategic-risk-radar-qdrant-vector-db
+    build: ./strategic-risk-radar-qdrant-vector-db
+    image: strategic-risk-radar-qdrant-vector-db:local
     restart: unless-stopped
     ports:
       - "127.0.0.1:${QDRANT_PORT:-6334}:6333"
@@ -34,7 +34,7 @@ services:
     image: strategic-risk-radar-rag-api:local
     restart: unless-stopped
     environment:
-      QDRANT_URL: http://vector-db:6333
+      QDRANT_URL: http://qdrant-vector-db:6333
       RAG_COLLECTION_NAME: strategic_risk_radar_docs
       EMBEDDING_MODEL_NAME: BAAI/bge-small-en-v1.5
       RAG_VECTOR_SIZE: "384"
@@ -43,7 +43,7 @@ services:
     ports:
       - "127.0.0.1:${RAG_API_PORT:-8100}:8100"
     depends_on:
-      - vector-db
+      - qdrant-vector-db
 
   firecrawler:
     container_name: strategic-risk-radar-firecrawler
@@ -59,10 +59,10 @@ services:
     image: strategic-risk-radar-news-enrichment:local
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@postgres-db:5432/${POSTGRES_DB:-risk_radar}
       FIRECRAWLER_URL: http://firecrawler:8300
       RAG_API_URL: http://rag-api:8100
-      MODEL_BASE_URL: http://model:11434
+      MODEL_BASE_URL: http://ollama-model:11434
       MODEL_NAME: deepseek-r1:1.5b
       ENRICHMENT_INTERVAL_SECONDS: ${ENRICHMENT_INTERVAL_SECONDS:-300}
       ENRICHMENT_BATCH_SIZE: ${ENRICHMENT_BATCH_SIZE:-2}
@@ -72,19 +72,19 @@ services:
       MODEL_NUM_PREDICT: ${MODEL_NUM_PREDICT:-350}
       CLAIM_TIMEOUT_SECONDS: ${CLAIM_TIMEOUT_SECONDS:-1800}
     depends_on:
-      db:
+      postgres-db:
         condition: service_healthy
       firecrawler:
         condition: service_started
       rag-api:
         condition: service_started
-      model:
+      ollama-model:
         condition: service_healthy
 
-  db:
-    container_name: strategic-risk-radar-db
-    build: ./strategic-risk-radar-db
-    image: strategic-risk-radar-db:local
+  postgres-db:
+    container_name: strategic-risk-radar-postgres-db
+    build: ./strategic-risk-radar-postgres-db
+    image: strategic-risk-radar-postgres-db:local
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-risk_radar}
       POSTGRES_USER: ${POSTGRES_USER:-risk_radar}
@@ -100,12 +100,12 @@ services:
       retries: 20
 
   db-migrate:
-    image: strategic-risk-radar-db:local
+    image: strategic-risk-radar-postgres-db:local
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-risk_radar}
-    command: ["psql", "-h", "db", "-U", "${POSTGRES_USER:-risk_radar}", "-d", "${POSTGRES_DB:-risk_radar}", "-f", "/docker-entrypoint-initdb.d/001-init.sql"]
+    command: ["psql", "-h", "postgres-db", "-U", "${POSTGRES_USER:-risk_radar}", "-d", "${POSTGRES_DB:-risk_radar}", "-f", "/docker-entrypoint-initdb.d/001-init.sql"]
     depends_on:
-      db:
+      postgres-db:
         condition: service_healthy
 
   news-ingestion:
@@ -113,13 +113,13 @@ services:
     build: ./strategic-risk-radar-news-ingestion
     image: strategic-risk-radar-news-ingestion:local
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@postgres-db:5432/${POSTGRES_DB:-risk_radar}
       GUARDIAN_API_KEY: ${GUARDIAN_API_KEY:-test}
       INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-10}
       INGESTION_BACKFILL_DAYS: ${INGESTION_BACKFILL_DAYS:-7}
       INGESTION_REGULAR_WINDOW_MINUTES: ${INGESTION_REGULAR_WINDOW_MINUTES:-10}
     depends_on:
-      db:
+      postgres-db:
         condition: service_healthy
     restart: unless-stopped
 
@@ -128,11 +128,11 @@ services:
     build: ./strategic-risk-radar-data-studio-backend
     image: strategic-risk-radar-data-studio-backend:local
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@postgres-db:5432/${POSTGRES_DB:-risk_radar}
     ports:
       - "8000:8000"
     depends_on:
-      db:
+      postgres-db:
         condition: service_healthy
 
   data-studio-frontend:
