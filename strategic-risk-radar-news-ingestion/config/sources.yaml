@@ -4,7 +4,6 @@ keywords:
       - military escalation
       - conflict escalation
       - hostilities intensify
-    guardian_query: (Iran OR Tehran OR "Middle East" OR Israel OR Lebanon OR Syria OR Yemen) AND (war OR conflict OR attack OR strikes OR ceasefire OR escalation OR sanctions)
   - name: maritime and cargo disruption
     terms:
       - attack on commercial shipping
@@ -12,28 +11,24 @@ keywords:
       - shipping lane closure
       - port closure
       - no safe transit
-    guardian_query: ("Strait of Hormuz" OR Hormuz OR "Red Sea" OR shipping OR cargo OR vessel OR tanker OR port) AND (attack OR disruption OR seized OR closure OR blockade OR sanctions)
   - name: aviation and passenger disruption
     terms:
       - airspace closure
       - airport closure
       - flight suspension
       - mass flight cancellation
-    guardian_query: (airspace OR airport OR flight OR airline OR passenger OR aviation) AND (closure OR suspension OR cancelled OR cancellation OR disruption OR reroute)
   - name: migration and residency pressure
     terms:
       - refugee influx
       - cross-border displacement
       - mass arrival
       - visa suspension
-    guardian_query: (refugee OR refugees OR migrant OR migrants OR asylum OR displacement OR visa OR residency) AND (influx OR border OR suspension OR expired OR overstay OR deportation)
   - name: identity and border crime
     terms:
       - travel document fraud
       - fraudulent passport
       - migrant smuggling
       - human trafficking
-    guardian_query: ("travel document" OR passport OR visa OR identity OR border OR trafficking OR smuggling) AND (fraud OR fraudulent OR forged OR fake OR illegal)
 
 sources:
   - id: gdelt
@@ -50,7 +45,7 @@ sources:
     enabled: true
     url: https://content.guardianapis.com/search
     api_key_env: GUARDIAN_API_KEY
-    api_key: 0d8ebbc6-d8dd-4d5c-8c5d-7cd8fe6ffa59
+    api_key: test
     max_records: 50
     schedule_minutes: 30
     retry_attempts: 3

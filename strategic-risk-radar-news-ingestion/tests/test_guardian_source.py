@@ -11,7 +11,7 @@ def test_guardian_fetches_keyword_group_and_strips_html():
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
         assert "api-key=test-key" in url
-        assert "%22airspace+closure%22+OR+%22airport+closure%22" in url
+        assert "q=airspace+closure+OR+airport+closure" in url
         assert "from-date=2026-06-01" in url
         assert "to-date=2026-06-02" in url
         return httpx.Response(200, json={"response": {"results": [{
@@ -43,32 +43,6 @@ def test_guardian_fetches_keyword_group_and_strips_html():
     assert results[0].items[0].summary == "Flights suspended after security incident."
 
 
-def test_guardian_uses_source_specific_query_when_configured():
-    def handler(request: httpx.Request) -> httpx.Response:
-        url = str(request.url)
-        assert "q=%28Iran+OR+Hormuz%29+AND+%28war+OR+shipping%29" in url
-        assert "%22airspace+closure%22" not in url
-        return httpx.Response(200, json={"response": {"results": []}})
-
-    source = GuardianSource(
-        {"id": "guardian", "url": "https://example.test/search", "api_key": "test-key", "retry_attempts": 1},
-        httpx.Client(transport=httpx.MockTransport(handler)),
-    )
-    keyword = KeywordSpec(
-        "aviation disruption",
-        ("airspace closure", "airport closure"),
-        "(Iran OR Hormuz) AND (war OR shipping)",
-    )
-    window = TimeWindow(
-        datetime(2026, 6, 1, tzinfo=timezone.utc),
-        datetime(2026, 6, 2, tzinfo=timezone.utc),
-    )
-
-    results = list(source.fetch((keyword,), window))
-
-    assert results[0].retrieved_count == 0
-
-
 def test_guardian_api_key_env_overrides_default(monkeypatch, tmp_path):
     config = tmp_path / "sources.yaml"
     config.write_text(
@@ -77,7 +51,6 @@ keywords:
   - name: test
     terms:
       - test
-    guardian_query: Iran AND shipping
 sources:
   - id: guardian
     type: guardian
@@ -93,4 +66,9 @@ sources:
     settings = load_settings(config)
 
     assert settings.sources[0]["api_key"] == "real-key"
-    assert settings.keywords[0].guardian_query == "Iran AND shipping"
+
+
+def test_guardian_query_joins_terms_with_or():
+    keyword = KeywordSpec("conflict", ("military escalation", "conflict escalation"))
+
+    assert keyword.guardian_query == "military escalation OR conflict escalation"

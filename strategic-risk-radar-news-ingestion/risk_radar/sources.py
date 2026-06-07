@@ -82,10 +82,9 @@ class GuardianSource(Source):
         if not api_key:
             raise SourceSkipped("GUARDIAN_API_KEY is not configured")
         for keyword in keywords:
-            query = keyword.guardian_query or keyword.gdelt_query
             response = self.request("GET", self.config["url"], params={
                 "api-key": api_key,
-                "q": query,
+                "q": keyword.guardian_query,
                 "from-date": window.start.date().isoformat(),
                 "to-date": window.end.date().isoformat(),
                 "order-by": "newest",

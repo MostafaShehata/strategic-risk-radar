@@ -18,11 +18,7 @@ class Settings:
 def load_settings(path: str | Path) -> Settings:
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     keywords = tuple(
-        KeywordSpec(
-            keyword["name"],
-            tuple(keyword["terms"]),
-            keyword.get("guardian_query"),
-        )
+        KeywordSpec(keyword["name"], tuple(keyword["terms"]))
         for keyword in data.get("keywords", [])
     )
     sources = []

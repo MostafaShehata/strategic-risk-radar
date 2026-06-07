@@ -126,7 +126,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}?q=(Iran%20OR%20Tehran%20OR%20%22Middle%20East%22%20OR%20Israel%20OR%20Lebanon%20OR%20Syria%20OR%20Yemen)%20AND%20(war%20OR%20conflict%20OR%20attack%20OR%20strikes%20OR%20ceasefire%20OR%20escalation%20OR%20sanctions)&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+            "url": "{{baseUrl}}?q=military%20escalation%20OR%20conflict%20escalation%20OR%20hostilities%20intensify&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
           }
         },
         {
@@ -134,7 +134,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}?q=(%22Strait%20of%20Hormuz%22%20OR%20Hormuz%20OR%20%22Red%20Sea%22%20OR%20shipping%20OR%20cargo%20OR%20vessel%20OR%20tanker%20OR%20port)%20AND%20(attack%20OR%20disruption%20OR%20seized%20OR%20closure%20OR%20blockade%20OR%20sanctions)&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+            "url": "{{baseUrl}}?q=attack%20on%20commercial%20shipping%20OR%20vessel%20seized%20OR%20shipping%20lane%20closure%20OR%20port%20closure%20OR%20no%20safe%20transit&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
           }
         },
         {
@@ -142,7 +142,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}?q=(airspace%20OR%20airport%20OR%20flight%20OR%20airline%20OR%20passenger%20OR%20aviation)%20AND%20(closure%20OR%20suspension%20OR%20cancelled%20OR%20cancellation%20OR%20disruption%20OR%20reroute)&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+            "url": "{{baseUrl}}?q=airspace%20closure%20OR%20airport%20closure%20OR%20flight%20suspension%20OR%20mass%20flight%20cancellation&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
           }
         },
         {
@@ -150,7 +150,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}?q=(refugee%20OR%20refugees%20OR%20migrant%20OR%20migrants%20OR%20asylum%20OR%20displacement%20OR%20visa%20OR%20residency)%20AND%20(influx%20OR%20border%20OR%20suspension%20OR%20expired%20OR%20overstay%20OR%20deportation)&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+            "url": "{{baseUrl}}?q=refugee%20influx%20OR%20cross-border%20displacement%20OR%20mass%20arrival%20OR%20visa%20suspension&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
           }
         },
         {
@@ -158,7 +158,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}?q=(%22travel%20document%22%20OR%20passport%20OR%20visa%20OR%20identity%20OR%20border%20OR%20trafficking%20OR%20smuggling)%20AND%20(fraud%20OR%20fraudulent%20OR%20forged%20OR%20fake%20OR%20illegal)&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+            "url": "{{baseUrl}}?q=travel%20document%20fraud%20OR%20fraudulent%20passport%20OR%20migrant%20smuggling%20OR%20human%20trafficking&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
           }
         }
       ]

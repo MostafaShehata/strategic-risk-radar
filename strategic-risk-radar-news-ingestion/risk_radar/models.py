@@ -7,12 +7,15 @@ from typing import Any
 class KeywordSpec:
     name: str
     terms: tuple[str, ...]
-    guardian_query: str | None = None
 
     @property
     def gdelt_query(self) -> str:
         phrases = " OR ".join(f'"{term}"' for term in self.terms)
         return f"({phrases})"
+
+    @property
+    def guardian_query(self) -> str:
+        return " OR ".join(self.terms)
 
 
 @dataclass(frozen=True)
