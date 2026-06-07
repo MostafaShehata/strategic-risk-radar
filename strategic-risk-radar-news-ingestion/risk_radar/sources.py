@@ -291,7 +291,7 @@ SOURCE_TYPES = {
     "rss": RssSource,
     "state_travel_advisories": StateTravelAdvisoriesSource,
     "faa_airport_status": FaaAirportStatusSource,
-    "wco_customs_announcements": WcoCustomsAnnouncementsSource,
+    "wco_customs": WcoCustomsAnnouncementsSource,
 }
 
 

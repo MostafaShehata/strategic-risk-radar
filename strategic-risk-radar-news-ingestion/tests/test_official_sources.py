@@ -129,7 +129,7 @@ def test_wco_source_matches_customs_keywords_from_detail_body():
         return httpx.Response(200, text=detail)
 
     source = WcoCustomsAnnouncementsSource(
-        {"id": "wco_customs_announcements", "url": "https://www.wcoomd.org/en/media/newsroom.aspx", "retry_attempts": 1},
+        {"id": "wco_customs", "url": "https://www.wcoomd.org/en/media/newsroom.aspx", "retry_attempts": 1},
         httpx.Client(transport=httpx.MockTransport(handler)),
     )
     keyword = KeywordSpec("customs and trade facilitation", ("customs modernization",))

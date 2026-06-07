@@ -49,8 +49,9 @@ sources:
     type: gdelt
     enabled: false
     url: https://api.gdeltproject.org/api/v2/doc/doc
-    max_records: 150
+    max_records: 250
     minimum_request_interval_seconds: 5.2
+    prevent_overlap: true
     schedule_minutes: 3
     retry_attempts: 3
 
@@ -60,7 +61,7 @@ sources:
     url: https://content.guardianapis.com/search
     api_key_env: GUARDIAN_API_KEY
     api_key: test
-    max_records: 50
+    max_records: 250
     schedule_minutes: 3
     retry_attempts: 3
 
@@ -78,8 +79,8 @@ sources:
     schedule_minutes: 3
     retry_attempts: 3
 
-  - id: wco_customs_announcements
-    type: wco_customs_announcements
+  - id: wco_customs
+    type: wco_customs
     enabled: true
     url: https://www.wcoomd.org/en/media/newsroom.aspx
     max_records: 20

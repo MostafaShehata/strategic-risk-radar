@@ -31,8 +31,9 @@ def run_source_job(
     backfill_days: float,
     regular_window_minutes: float,
     source_config: dict,
-) -> UUID:
+) -> UUID | None:
     store = Store(database_url)
+    source_id = source_config["id"]
     config_snapshot = {
         "keywords": settings.snapshot.get("keywords", []),
         "sources": [source_config],
@@ -43,15 +44,22 @@ def run_source_job(
             "regular_window_minutes": regular_window_minutes,
         },
     }
-    run_id = store.create_run(config_snapshot)
-    source_run_id = None
+    run_id = None
     try:
         with httpx.Client(timeout=45, follow_redirects=True,
                           headers={"User-Agent": "Strategic-Risk-Radar-PoC/0.2"}) as client:
-            window = store.next_window(source_config["id"], backfill_days, regular_window_minutes)
-            source_run_id = store.begin_source(
-                run_id, source_config["id"], source_config["type"], window
+            window = store.next_window(source_id, backfill_days, regular_window_minutes)
+            started_run = store.create_run_and_begin_source(
+                config_snapshot,
+                source_id,
+                source_config["type"],
+                window,
+                bool(source_config.get("prevent_overlap", False)),
             )
+            if started_run is None:
+                print(f"{source_id} job skipped: previous source run is still running", flush=True)
+                return None
+            run_id, source_run_id = started_run
             started = time.monotonic()
             processed_keywords = set()
             warnings = []
@@ -91,7 +99,8 @@ def run_source_job(
                 print(f"{source_config['id']}: {exc}", flush=True)
         store.finish_run(run_id)
     except Exception:
-        store.finish_run(run_id)
+        if run_id:
+            store.finish_run(run_id)
         raise
     print(f"{source_config['id']} job completed: {run_id}", flush=True)
     return run_id
@@ -113,7 +122,8 @@ def run_sources(
             for source in sources
         ]
         for future in as_completed(futures):
-            run_ids.append(future.result())
+            if run_id := future.result():
+                run_ids.append(run_id)
     return run_ids
 
 

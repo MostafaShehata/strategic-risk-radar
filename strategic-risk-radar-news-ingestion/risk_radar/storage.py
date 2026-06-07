@@ -38,6 +38,34 @@ class Store:
                 (json.dumps(config),),
             ).fetchone()[0]
 
+    def create_run_and_begin_source(
+        self,
+        config: dict[str, Any],
+        source_id: str,
+        source_type: str,
+        window: TimeWindow,
+        prevent_overlap: bool = False,
+    ) -> tuple[UUID, int] | None:
+        with psycopg.connect(self.database_url) as connection:
+            if prevent_overlap:
+                connection.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (source_id,))
+                running = connection.execute(
+                    "SELECT 1 FROM source_runs WHERE source_id=%s AND status='running' LIMIT 1",
+                    (source_id,),
+                ).fetchone()
+                if running:
+                    return None
+            run_id = connection.execute(
+                "INSERT INTO ingestion_runs(config_snapshot) VALUES (%s::jsonb) RETURNING id",
+                (json.dumps(config),),
+            ).fetchone()[0]
+            source_run_id = connection.execute(
+                """INSERT INTO source_runs(run_id, source_id, source_type, window_start, window_end)
+                   VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                (run_id, source_id, source_type, window.start, window.end),
+            ).fetchone()[0]
+            return run_id, source_run_id
+
     def next_window(
         self,
         source_id: str,
