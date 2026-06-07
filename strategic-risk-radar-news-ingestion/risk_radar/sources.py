@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 import re
 import time
 from collections.abc import Iterable
 from typing import Any
+import xml.etree.ElementTree as ET
 
 import feedparser
 import httpx
@@ -22,6 +24,10 @@ class Source(ABC):
         self.last_request_at: float | None = None
 
     def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        headers = dict(self.config.get("headers", {}))
+        headers.update(kwargs.pop("headers", {}))
+        if headers:
+            kwargs["headers"] = headers
         minimum = float(self.config.get("minimum_request_interval_seconds", 0))
         if self.last_request_at is not None:
             time.sleep(max(0, minimum - (time.monotonic() - self.last_request_at)))
@@ -109,6 +115,8 @@ class GuardianSource(Source):
 
 
 class RssSource(Source):
+    source_type = "rss"
+
     def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
         response = self.request("GET", self.config["url"])
         entries = []
@@ -124,7 +132,7 @@ class RssSource(Source):
                     url = entry.get("link", "")
                     body = strip_html(entry.get("content", [{}])[0].get("value", "") if entry.get("content") else summary)
                     items.append(RawItem(
-                        self.config["id"], "rss", str(entry.get("id") or stable_id(url, title)),
+                        self.config["id"], self.source_type, str(entry.get("id") or stable_id(url, title)),
                         url, title, summary, body,
                         parse_datetime(entry.get("published") or entry.get("updated")),
                         keyword.name, dict(entry),
@@ -134,14 +142,86 @@ class RssSource(Source):
             )
 
 
+class StateTravelAdvisoriesSource(RssSource):
+    source_type = "government_advisory"
+
+
+class FaaAirportStatusSource(Source):
+    source_type = "aviation_notice"
+
+    def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
+        response = self.request("GET", self.config["url"])
+        candidates = [
+            item for item in parse_faa_airport_status(response.text, window.end.year)
+            if item["published_at"] is None or window.start <= item["published_at"] <= window.end
+        ]
+        for keyword in keywords:
+            items = []
+            for candidate in candidates:
+                title = str(candidate["title"])
+                body = str(candidate.get("body") or "")
+                haystack = f"{title} {body}"
+                if any(contains_keyword(haystack, term) for term in keyword.terms):
+                    summary = str(candidate.get("summary") or "")
+                    items.append(RawItem(
+                        self.config["id"], self.source_type,
+                        stable_id(str(candidate["url"]), title),
+                        str(candidate["url"]), title, summary, body,
+                        candidate["published_at"], keyword.name, candidate,
+                    ))
+            yield KeywordResult(keyword.name, 1 if keyword == keywords[0] else 0, len(candidates), tuple(items))
+
+
 def strip_html(value: str) -> str:
     return re.sub(r"<[^>]+>", "", value or "").strip()
+
+
+def clean_text(value: str | None) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
+
+
+def parse_faa_airport_status(xml_text: str, year: int) -> list[dict[str, Any]]:
+    root = ET.fromstring(xml_text)
+    notices = []
+    for delay_type in root.findall("Delay_type"):
+        notice_type = clean_text(delay_type.findtext("Name"))
+        for airport in delay_type.findall(".//Airport"):
+            code = clean_text(airport.findtext("ARPT"))
+            reason = clean_text(airport.findtext("Reason"))
+            start = clean_text(airport.findtext("Start"))
+            reopen = clean_text(airport.findtext("Reopen"))
+            published_at = parse_faa_time(start, year)
+            title = f"{notice_type}: {code}" if code else notice_type
+            body = " ".join(part for part in (reason, start, reopen) if part)
+            notices.append({
+                "title": title,
+                "url": "https://nasstatus.faa.gov/",
+                "summary": notice_type,
+                "body": body,
+                "published_at": published_at,
+                "airport": code,
+                "reason": reason,
+                "start": start,
+                "reopen": reopen,
+            })
+    return notices
+
+
+def parse_faa_time(value: str, year: int) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(f"{value} {year}", "%b %d at %H:%M UTC. %Y").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
 
 
 SOURCE_TYPES = {
     "gdelt": GdeltSource,
     "guardian": GuardianSource,
     "rss": RssSource,
+    "state_travel_advisories": StateTravelAdvisoriesSource,
+    "faa_airport_status": FaaAirportStatusSource,
 }
 
 

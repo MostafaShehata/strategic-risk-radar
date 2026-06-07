@@ -50,16 +50,16 @@ sources:
     schedule_minutes: 10
     retry_attempts: 3
 
-  - id: un_news_middle_east
-    type: rss
+  - id: us_state_travel_advisories
+    type: state_travel_advisories
     enabled: true
-    url: https://news.un.org/feed/subscribe/en/news/region/middle-east/feed/rss.xml
+    url: https://travel.state.gov/_res/rss/TAsTWs.xml
     schedule_minutes: 10
     retry_attempts: 3
 
-  - id: gdacs_alerts
-    type: rss
+  - id: faa_airport_status
+    type: faa_airport_status
     enabled: true
-    url: https://www.gdacs.org/xml/rss.xml
+    url: https://nasstatus.faa.gov/api/airport-status-information
     schedule_minutes: 10
     retry_attempts: 3
