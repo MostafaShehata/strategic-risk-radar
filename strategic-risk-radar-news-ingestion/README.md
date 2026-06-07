@@ -13,6 +13,9 @@ and then retries.
 The configured keywords are five high-signal operational groups. Each group
 contains several precise phrases joined with `OR` for one GDELT request. RSS
 feeds are downloaded once and matched locally against any phrase in each group.
+Guardian uses a separate `guardian_query` per group because Guardian supports
+broader `AND`, `OR`, and parenthesized query operators. This keeps GDELT
+precise while allowing Guardian to discover more relevant articles.
 
 - Conflict escalation
 - Maritime and cargo disruption
@@ -57,8 +60,8 @@ Import `postman/Guardian-News.postman_collection.json` into Postman.
   Replace it with your free developer key when you have one.
 - Send `Single Configurable Keyword` to test one keyword. Change the
   `keyword`, `lookbackHours`, or `pageSize` collection variables as needed.
-- Run the `Project Keyword Groups` folder to test all five configured query
-  groups against the same date window used by the application.
+- Run the `Project Keyword Groups` folder to test the same Guardian-specific
+  `guardian_query` strings used by the application.
 
 The collection automatically calculates `from-date` and `to-date`, requests
 English results, and validates that Guardian returns a successful response.

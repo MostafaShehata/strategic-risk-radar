@@ -7,6 +7,7 @@ from typing import Any
 class KeywordSpec:
     name: str
     terms: tuple[str, ...]
+    guardian_query: str | None = None
 
     @property
     def gdelt_query(self) -> str:
