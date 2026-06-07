@@ -123,6 +123,13 @@ nav button.active {
   align-items: start;
 }
 
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
 .two-column {
   display: grid;
   grid-template-columns: 330px 1fr;
@@ -301,6 +308,16 @@ th {
   background: #f7f9fb;
 }
 
+.summary-table td strong,
+.summary-table td small {
+  display: block;
+}
+
+.summary-table td small {
+  color: #64748b;
+  margin-top: 4px;
+}
+
 .filters {
   display: flex;
   gap: 10px;
@@ -336,6 +353,12 @@ select {
   border: 1px solid #e0e7ee;
   border-radius: 9px;
   padding: 16px;
+  cursor: pointer;
+}
+
+.documents article.selected {
+  border-color: #08717a;
+  background: #effaf8;
 }
 
 .enriched-grid {
@@ -420,6 +443,22 @@ select {
 .body-preview {
   color: #526175;
   line-height: 1.5;
+}
+
+.preserve {
+  white-space: pre-wrap;
+  max-height: 420px;
+  overflow: auto;
+}
+
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  max-height: 360px;
+  overflow: auto;
+  font-size: 11px;
 }
 
 .chips {
@@ -621,7 +660,8 @@ select {
 @media (max-width: 1100px) {
   .run-layout,
   .two-column,
-  .workspace {
+  .workspace,
+  .home-grid {
     grid-template-columns: 1fr;
   }
 

@@ -26,6 +26,208 @@ def scalar(sql: str, params: tuple[Any, ...] = ()) -> Any:
     return rows[0]["value"] if rows else None
 
 
+AGENT_NAMES = [
+    "Normalize / Body",
+    "Firecrawler",
+    "Entity Extraction",
+    "Geo / Transport",
+    "Path Impact",
+    "KPI Impact",
+    "Risk Scoring",
+    "Topic Clustering",
+    "Final Validator",
+]
+
+
+def agent_metric(agent: str, last: dict[str, Any], total: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "agent": agent,
+        "last_run_id": last.get("run_id"),
+        "last_run_status": last.get("run_status", "no_data"),
+        "last_run_started_at": last.get("started_at"),
+        "last_run_completed_at": last.get("completed_at"),
+        "last_processed": last.get("processed", 0),
+        "last_success": last.get("success", 0),
+        "last_failed": last.get("failed", 0),
+        "last_body_enriched": last.get("body_enriched", 0),
+        "total_processed": total.get("processed", 0),
+        "total_success": total.get("success", 0),
+        "total_failed": total.get("failed", 0),
+        "total_body_enriched": total.get("body_enriched", 0),
+        "notes": last.get("notes", ""),
+    }
+
+
+def enrichment_agent_metrics(run_id: str | None = None) -> list[dict[str, Any]]:
+    if run_id:
+        run_rows = query(
+            """SELECT id,started_at,completed_at,status,processed_count,success_count,failed_count
+               FROM enrichment_runs
+               WHERE id=%s""",
+            (run_id,),
+        )
+    else:
+        run_rows = query(
+            """SELECT id,started_at,completed_at,status,processed_count,success_count,failed_count
+               FROM enrichment_runs
+               ORDER BY started_at DESC LIMIT 1"""
+        )
+    run = run_rows[0] if run_rows else None
+    run_filter = (
+        """JOIN enrichment_runs r ON r.id=%s
+           WHERE e.created_at >= r.started_at
+             AND e.created_at <= coalesce(r.completed_at, now()) + interval '5 seconds'"""
+    )
+    run_fetch_filter = (
+        """JOIN enrichment_runs r ON r.id=%s
+           WHERE f.created_at >= r.started_at
+             AND f.created_at <= coalesce(r.completed_at, now()) + interval '5 seconds'"""
+    )
+    run_topic_filter = (
+        """JOIN enrichment_runs r ON r.id=%s
+           WHERE ta.created_at >= r.started_at
+             AND ta.created_at <= coalesce(r.completed_at, now()) + interval '5 seconds'"""
+    )
+
+    last_base = {
+        "run_id": run["id"] if run else None,
+        "run_status": run["status"] if run else "no_data",
+        "started_at": run["started_at"] if run else None,
+        "completed_at": run["completed_at"] if run else None,
+    }
+
+    if run:
+        normalized_last = query(
+            f"""SELECT count(*) AS processed,
+                       count(*) FILTER (WHERE length(normalized_body) > 0) AS success,
+                       count(*) FILTER (WHERE length(normalized_body) = 0) AS failed,
+                       count(*) FILTER (WHERE length(normalized_body) > 0) AS body_enriched
+                FROM enriched_news_items e {run_filter}""",
+            (run["id"],),
+        )[0]
+        fire_last = query(
+            f"""SELECT count(*) AS processed,
+                       count(*) FILTER (WHERE f.status='success') AS success,
+                       count(*) FILTER (WHERE f.status<>'success') AS failed,
+                       count(*) FILTER (WHERE f.status='success' AND length(f.body) > 0) AS body_enriched
+                FROM article_content_fetches f {run_fetch_filter}""",
+            (run["id"],),
+        )[0]
+        entity_last = query(
+            f"""SELECT count(DISTINCT e.id) AS processed,
+                       count(DISTINCT e.id) FILTER (WHERE ent.id IS NOT NULL) AS success,
+                       count(DISTINCT e.id) FILTER (WHERE ent.id IS NULL) AS failed
+                FROM enriched_news_items e
+                LEFT JOIN news_entities ent ON ent.enriched_news_item_id=e.id
+                {run_filter}""",
+            (run["id"],),
+        )[0]
+        path_last = query(
+            f"""SELECT count(DISTINCT e.id) AS processed,
+                       count(p.id) AS success,
+                       0 AS failed
+                FROM enriched_news_items e
+                LEFT JOIN news_path_impacts p ON p.enriched_news_item_id=e.id
+                {run_filter}""",
+            (run["id"],),
+        )[0]
+        kpi_last = query(
+            f"""SELECT count(DISTINCT e.id) AS processed,
+                       count(k.id) AS success,
+                       count(DISTINCT e.id) FILTER (WHERE k.id IS NULL) AS failed
+                FROM enriched_news_items e
+                LEFT JOIN news_kpi_impacts k ON k.enriched_news_item_id=e.id
+                {run_filter}""",
+            (run["id"],),
+        )[0]
+        topic_last = query(
+            f"""SELECT count(*) AS processed,
+                       count(*) AS success,
+                       0 AS failed
+                FROM topic_articles ta {run_topic_filter}""",
+            (run["id"],),
+        )[0]
+        validator_last = {
+            "processed": run["processed_count"],
+            "success": run["success_count"],
+            "failed": run["failed_count"],
+        }
+    else:
+        normalized_last = fire_last = entity_last = path_last = kpi_last = topic_last = validator_last = {}
+
+    normalized_total = query(
+        """SELECT count(*) AS processed,
+                  count(*) FILTER (WHERE length(normalized_body) > 0) AS success,
+                  count(*) FILTER (WHERE length(normalized_body) = 0) AS failed,
+                  count(*) FILTER (WHERE length(normalized_body) > 0) AS body_enriched
+           FROM enriched_news_items"""
+    )[0]
+    fire_total = query(
+        """SELECT count(*) AS processed,
+                  count(*) FILTER (WHERE status='success') AS success,
+                  count(*) FILTER (WHERE status<>'success') AS failed,
+                  count(*) FILTER (WHERE status='success' AND length(body) > 0) AS body_enriched
+           FROM article_content_fetches"""
+    )[0]
+    entity_total = query(
+        """SELECT count(DISTINCT e.id) AS processed,
+                  count(DISTINCT e.id) FILTER (WHERE ent.id IS NOT NULL) AS success,
+                  count(DISTINCT e.id) FILTER (WHERE ent.id IS NULL) AS failed
+           FROM enriched_news_items e
+           LEFT JOIN news_entities ent ON ent.enriched_news_item_id=e.id"""
+    )[0]
+    path_total = query(
+        """SELECT count(DISTINCT e.id) AS processed,
+                  count(p.id) AS success,
+                  0 AS failed
+           FROM enriched_news_items e
+           LEFT JOIN news_path_impacts p ON p.enriched_news_item_id=e.id"""
+    )[0]
+    kpi_total = query(
+        """SELECT count(DISTINCT e.id) AS processed,
+                  count(k.id) AS success,
+                  count(DISTINCT e.id) FILTER (WHERE k.id IS NULL) AS failed
+           FROM enriched_news_items e
+           LEFT JOIN news_kpi_impacts k ON k.enriched_news_item_id=e.id"""
+    )[0]
+    topic_total = query(
+        """SELECT count(*) AS processed,
+                  count(*) AS success,
+                  0 AS failed
+           FROM topic_articles"""
+    )[0]
+    validator_total = query(
+        """SELECT coalesce(sum(processed_count),0) AS processed,
+                  coalesce(sum(success_count),0) AS success,
+                  coalesce(sum(failed_count),0) AS failed
+           FROM enrichment_runs"""
+    )[0]
+
+    last_map = {
+        "Normalize / Body": {**last_base, **normalized_last, "notes": "Normalized body available on enriched article."},
+        "Firecrawler": {**last_base, **fire_last, "notes": "Only runs when raw body is missing and article URL can be fetched."},
+        "Entity Extraction": {**last_base, **entity_last, "notes": "Countries, cities, transport, organizations, and people."},
+        "Geo / Transport": {**last_base, **entity_last, "notes": "Resolved countries, airports, ports, and transport entities."},
+        "Path Impact": {**last_base, **path_last, "notes": "Route/path risk rows created."},
+        "KPI Impact": {**last_base, **kpi_last, "notes": "Operational KPI impact rows created."},
+        "Risk Scoring": {**last_base, **normalized_last, "notes": "Article-level risk score and level."},
+        "Topic Clustering": {**last_base, **topic_last, "notes": "Article-topic links created."},
+        "Final Validator": {**last_base, **validator_last, "notes": "Run-level validation and completion counters."},
+    }
+    total_map = {
+        "Normalize / Body": normalized_total,
+        "Firecrawler": fire_total,
+        "Entity Extraction": entity_total,
+        "Geo / Transport": entity_total,
+        "Path Impact": path_total,
+        "KPI Impact": kpi_total,
+        "Risk Scoring": normalized_total,
+        "Topic Clustering": topic_total,
+        "Final Validator": validator_total,
+    }
+    return [agent_metric(agent, last_map[agent], total_map[agent]) for agent in AGENT_NAMES]
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     query("SELECT 1")
@@ -56,6 +258,50 @@ def overview() -> dict[str, Any]:
            FROM enrichment_runs"""
     )[0]
     return {**row, **enrichment}
+
+
+@app.get("/api/summary/ingestion")
+def ingestion_summary() -> list[dict[str, Any]]:
+    return query(
+        """WITH latest AS (
+               SELECT DISTINCT ON (source_id)
+                      id AS source_run_id,run_id,source_id,source_type,started_at,completed_at,status,
+                      window_start,window_end,request_count,retrieved_count,matched_count,
+                      inserted_count,duplicate_count,duration_ms,error_message
+               FROM source_runs
+               ORDER BY source_id,started_at DESC
+           ),
+           totals AS (
+               SELECT source_id,source_type,
+                      count(*) AS total_runs,
+                      coalesce(sum(request_count),0) AS total_requests,
+                      coalesce(sum(retrieved_count),0) AS total_retrieved,
+                      coalesce(sum(matched_count),0) AS total_matched,
+                      coalesce(sum(inserted_count),0) AS total_inserted,
+                      coalesce(sum(duplicate_count),0) AS total_duplicates,
+                      count(*) FILTER (WHERE status <> 'completed') AS total_errors,
+                      max(window_end) FILTER (WHERE status='completed') AS latest_success_window_end
+               FROM source_runs
+               GROUP BY source_id,source_type
+           )
+           SELECT l.source_id,l.source_type,l.source_run_id,l.run_id AS last_run_id,
+                  l.started_at AS last_started_at,l.completed_at AS last_completed_at,
+                  l.status AS last_status,l.window_start AS last_window_start,l.window_end AS last_window_end,
+                  l.request_count AS last_requests,l.retrieved_count AS last_retrieved,
+                  l.matched_count AS last_matched,l.inserted_count AS last_inserted,
+                  l.duplicate_count AS last_duplicates,l.duration_ms AS last_duration_ms,
+                  l.error_message AS last_error_message,
+                  t.total_runs,t.total_requests,t.total_retrieved,t.total_matched,
+                  t.total_inserted,t.total_duplicates,t.total_errors,t.latest_success_window_end
+           FROM latest l
+           JOIN totals t ON t.source_id=l.source_id
+           ORDER BY l.source_type,l.source_id"""
+    )
+
+
+@app.get("/api/summary/enrichment")
+def enrichment_summary() -> list[dict[str, Any]]:
+    return enrichment_agent_metrics()
 
 
 @app.get("/api/runs")
@@ -164,6 +410,43 @@ def documents(
     )
 
 
+@app.get("/api/documents/{document_id}")
+def document_detail(document_id: str) -> dict[str, Any]:
+    document_rows = query(
+        """SELECT n.id,n.source_id,n.source_type,n.external_id,n.url,n.title,n.summary,n.body,
+                  n.published_at,n.first_seen_at,n.processing_status,n.raw_payload,
+                  n.first_seen_run_id,n.enrichment_run_id,n.enrichment_claimed_at,
+                  string_agg(DISTINCT k.keyword, ', ' ORDER BY k.keyword) AS keywords
+           FROM raw_news_items n
+           LEFT JOIN raw_news_item_keywords k ON k.item_id=n.id
+           WHERE n.id=%s
+           GROUP BY n.id""",
+        (document_id,),
+    )
+    observations = query(
+        """SELECT o.run_id,o.source_run_id,o.keyword,o.was_inserted,o.observed_at,
+                  s.source_id,s.source_type,s.status AS source_run_status
+           FROM run_item_observations o
+           JOIN source_runs s ON s.id=o.source_run_id
+           WHERE o.item_id=%s
+           ORDER BY o.observed_at DESC""",
+        (document_id,),
+    )
+    fetches = query(
+        """SELECT url,status,fetcher,title,language,published_at,error_message,created_at,
+                  length(body) AS body_length
+           FROM article_content_fetches
+           WHERE raw_news_item_id=%s
+           ORDER BY created_at DESC""",
+        (document_id,),
+    )
+    return {
+        "document": document_rows[0] if document_rows else None,
+        "observations": observations,
+        "content_fetches": fetches,
+    }
+
+
 @app.get("/api/source-types")
 def source_types() -> list[dict[str, Any]]:
     return query(
@@ -236,7 +519,12 @@ def enrichment_run_detail(run_id: str) -> dict[str, Any]:
            ORDER BY e.created_at DESC""",
         (run_id,),
     )
-    return {"run": run_rows[0] if run_rows else None, "items": items}
+    return {"run": run_rows[0] if run_rows else None, "items": items, "agents": enrichment_agent_metrics(run_id)}
+
+
+@app.get("/api/enrichment/runs/{run_id}/agents")
+def enrichment_run_agents(run_id: str) -> list[dict[str, Any]]:
+    return enrichment_agent_metrics(run_id)
 
 
 @app.get("/api/enrichment/items")
@@ -403,7 +691,22 @@ def topic_detail(topic_id: str) -> dict[str, Any]:
            ORDER BY ta.is_primary_article DESC,e.risk_score DESC,e.created_at DESC""",
         (topic_id,),
     )
-    return {"topic": topic_rows[0] if topic_rows else None, "articles": articles}
+    kpis = query(
+        """SELECT k.kpi_name,
+                  count(*) AS article_count,
+                  round(avg(k.risk_score),1) AS average_risk_score,
+                  max(k.risk_score) AS highest_risk_score,
+                  max(k.risk_level) AS highest_risk_level,
+                  string_agg(DISTINCT k.impact_summary, ' | ') AS impact_summary,
+                  string_agg(DISTINCT k.evidence, ' | ') AS evidence
+           FROM news_kpi_impacts k
+           JOIN topic_articles ta ON ta.enriched_news_item_id=k.enriched_news_item_id
+           WHERE ta.topic_id=%s
+           GROUP BY k.kpi_name
+           ORDER BY highest_risk_score DESC,k.kpi_name""",
+        (topic_id,),
+    )
+    return {"topic": topic_rows[0] if topic_rows else None, "articles": articles, "kpis": kpis}
 
 
 @app.get("/api/enrichment/kpis")
