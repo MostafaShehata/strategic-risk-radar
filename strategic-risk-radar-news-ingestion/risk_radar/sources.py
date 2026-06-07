@@ -98,8 +98,6 @@ class GuardianSource(Source):
                 fields = article.get("fields", {})
                 title = strip_html(fields.get("headline") or article.get("webTitle", ""))
                 summary = strip_html(fields.get("trailText") or fields.get("bodyText", ""))
-                if not title.isascii() or not summary.isascii():
-                    continue
                 items.append(RawItem(
                     self.config["id"], "api", article.get("id", stable_id(article.get("webUrl", ""), title)),
                     article.get("webUrl", ""), title, summary,
@@ -120,8 +118,6 @@ class RssSource(Source):
             items = []
             for entry in entries:
                 title, summary = entry.get("title", ""), entry.get("summary", "")
-                if not title.isascii() or not summary.isascii():
-                    continue
                 if any(contains_keyword(f"{title} {summary}", term) for term in keyword.terms):
                     url = entry.get("link", "")
                     items.append(RawItem(
