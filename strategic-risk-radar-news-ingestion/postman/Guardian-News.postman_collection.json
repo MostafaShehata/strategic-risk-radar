@@ -1,0 +1,167 @@
+{
+  "info": {
+    "_postman_id": "6d70b8cf-80df-4f20-9df2-7a3f7df4f101",
+    "name": "Strategic Risk Radar - Guardian News",
+    "description": "Tests the Guardian Open Platform API source used by Strategic Risk Radar. The collection searches a configurable UTC lookback window, requests English articles, and includes the five project keyword groups.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const end = new Date();",
+          "const start = new Date(end.getTime() - Number(pm.collectionVariables.get('lookbackHours')) * 60 * 60 * 1000);",
+          "const guardianDate = date => date.toISOString().slice(0, 10);",
+          "pm.collectionVariables.set('fromDate', guardianDate(start));",
+          "pm.collectionVariables.set('toDate', guardianDate(end));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('HTTP status is 200', function () {",
+          "  pm.response.to.have.status(200);",
+          "});",
+          "pm.test('Guardian response is successful', function () {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.response.status).to.eql('ok');",
+          "  pm.expect(json.response.results).to.be.an('array');",
+          "});",
+          "pm.test('Shows result count for quick inspection', function () {",
+          "  const json = pm.response.json();",
+          "  console.log('Guardian results:', json.response.results.length, 'total:', json.response.total);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://content.guardianapis.com/search"
+    },
+    {
+      "key": "apiKey",
+      "value": "test"
+    },
+    {
+      "key": "keyword",
+      "value": "military escalation"
+    },
+    {
+      "key": "lookbackHours",
+      "value": "24"
+    },
+    {
+      "key": "pageSize",
+      "value": "50"
+    },
+    {
+      "key": "fromDate",
+      "value": ""
+    },
+    {
+      "key": "toDate",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Single Configurable Keyword",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}?q={{keyword}}&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "{{keyword}}"
+            },
+            {
+              "key": "api-key",
+              "value": "{{apiKey}}"
+            },
+            {
+              "key": "lang",
+              "value": "en"
+            },
+            {
+              "key": "from-date",
+              "value": "{{fromDate}}"
+            },
+            {
+              "key": "to-date",
+              "value": "{{toDate}}"
+            },
+            {
+              "key": "order-by",
+              "value": "newest"
+            },
+            {
+              "key": "page-size",
+              "value": "{{pageSize}}"
+            },
+            {
+              "key": "show-fields",
+              "value": "trailText,bodyText,shortUrl,headline"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Project Keyword Groups",
+      "item": [
+        {
+          "name": "Conflict Escalation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}?q=%22military%20escalation%22%20OR%20%22conflict%20escalation%22%20OR%20%22hostilities%20intensify%22&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+          }
+        },
+        {
+          "name": "Maritime and Cargo Disruption",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}?q=%22attack%20on%20commercial%20shipping%22%20OR%20%22vessel%20seized%22%20OR%20%22shipping%20lane%20closure%22%20OR%20%22port%20closure%22%20OR%20%22no%20safe%20transit%22&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+          }
+        },
+        {
+          "name": "Aviation and Passenger Disruption",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}?q=%22airspace%20closure%22%20OR%20%22airport%20closure%22%20OR%20%22flight%20suspension%22%20OR%20%22mass%20flight%20cancellation%22&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+          }
+        },
+        {
+          "name": "Migration and Residency Pressure",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}?q=%22refugee%20influx%22%20OR%20%22cross-border%20displacement%22%20OR%20%22mass%20arrival%22%20OR%20%22visa%20suspension%22&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+          }
+        },
+        {
+          "name": "Identity and Border Crime",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}?q=%22travel%20document%20fraud%22%20OR%20%22fraudulent%20passport%22%20OR%20%22migrant%20smuggling%22%20OR%20%22human%20trafficking%22&api-key={{apiKey}}&lang=en&from-date={{fromDate}}&to-date={{toDate}}&order-by=newest&page-size={{pageSize}}&show-fields=trailText,bodyText,shortUrl,headline"
+          }
+        }
+      ]
+    }
+  ]
+}

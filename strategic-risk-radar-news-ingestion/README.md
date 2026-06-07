@@ -49,6 +49,20 @@ Import `postman/GDELT-English-News.postman_collection.json` into Postman.
 The collection automatically calculates the latest UTC date range and verifies
 that successful responses contain an `articles` array with English results.
 
+## Test Guardian With Postman
+
+Import `postman/Guardian-News.postman_collection.json` into Postman.
+
+- The collection variable `apiKey` defaults to Guardian's public `test` key.
+  Replace it with your free developer key when you have one.
+- Send `Single Configurable Keyword` to test one keyword. Change the
+  `keyword`, `lookbackHours`, or `pageSize` collection variables as needed.
+- Run the `Project Keyword Groups` folder to test all five configured query
+  groups against the same date window used by the application.
+
+The collection automatically calculates `from-date` and `to-date`, requests
+English results, and validates that Guardian returns a successful response.
+
 ## RSS Retrieval Notes
 
 RSS sources are not queried per keyword. Each RSS feed is downloaded once per
