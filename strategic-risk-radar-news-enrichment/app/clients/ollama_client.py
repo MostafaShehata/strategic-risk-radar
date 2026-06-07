@@ -5,21 +5,6 @@ from typing import Any
 import httpx
 
 
-class FirecrawlerClient:
-    def __init__(self, base_url: str, timeout_seconds: int = 5) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.timeout_seconds = timeout_seconds
-
-    def crawl(self, url: str, source_id: str, raw_news_item_id: str) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout_seconds) as client:
-            response = client.post(
-                f"{self.base_url}/api/crawl",
-                json={"url": url, "source_id": source_id, "raw_news_item_id": raw_news_item_id},
-            )
-            response.raise_for_status()
-            return response.json()
-
-
 class OllamaClient:
     def __init__(
         self,
@@ -66,26 +51,3 @@ class OllamaClient:
             match = re.search(r"\{.*\}", candidate, re.DOTALL)
             candidate = match.group(0) if match else "{}"
         return json.loads(candidate)
-
-
-class RagApiClient:
-    def __init__(self, base_url: str, enabled: bool = True) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.enabled = enabled
-
-    def index_article(self, source: str, text: str, metadata: dict[str, Any]) -> None:
-        if not self.enabled or not text.strip():
-            return
-        try:
-            with httpx.Client(timeout=60) as client:
-                client.post(
-                    f"{self.base_url}/api/ingest/text",
-                    json={
-                        "source": source,
-                        "text": text,
-                        "document_type": "enriched_news",
-                        "metadata": metadata,
-                    },
-                ).raise_for_status()
-        except Exception:
-            return

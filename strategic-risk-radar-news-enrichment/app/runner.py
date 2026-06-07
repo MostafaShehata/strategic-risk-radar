@@ -5,7 +5,7 @@ from .clients import FirecrawlerClient, OllamaClient, RagApiClient
 from .config import settings
 from .graph import build_graph
 from .models import EnrichmentState
-from .nodes import EnrichmentNodes
+from .agents import EnrichmentWorkflowAgents
 from .repository import EnrichmentRepository
 
 
@@ -13,7 +13,7 @@ class EnrichmentRunner:
     def __init__(self) -> None:
         self.repository = EnrichmentRepository(settings.database_url)
         self.graph = build_graph(
-            EnrichmentNodes(
+            EnrichmentWorkflowAgents(
                 repository=self.repository,
                 firecrawler=FirecrawlerClient(settings.firecrawler_url, settings.firecrawler_timeout_seconds),
                 ollama=OllamaClient(

@@ -1,10 +1,10 @@
 from langgraph.graph import END, StateGraph
 
+from .agents import EnrichmentWorkflowAgents
 from .models import EnrichmentState
-from .nodes import EnrichmentNodes
 
 
-def build_graph(nodes: EnrichmentNodes):
+def build_graph(nodes: EnrichmentWorkflowAgents):
     graph = StateGraph(EnrichmentState)
     graph.add_node("load_raw_article", nodes.load_raw_article)
     graph.add_node("normalize", nodes.normalize)
