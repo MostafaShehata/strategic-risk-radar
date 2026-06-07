@@ -123,6 +123,20 @@ nav button.active {
   align-items: start;
 }
 
+.two-column {
+  display: grid;
+  grid-template-columns: 330px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(360px, .8fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .panel {
   padding: 18px;
   overflow: auto;
@@ -189,6 +203,11 @@ nav button.active {
 .badge.large {
   font-size: 12px;
   padding: 7px 11px;
+}
+
+.mono {
+  font-family: Consolas, Monaco, monospace;
+  word-break: break-all;
 }
 
 .summary-strip {
@@ -292,6 +311,14 @@ th {
   flex: 1;
 }
 
+.filters.compact {
+  flex-direction: column;
+}
+
+.score-input {
+  width: 105px;
+}
+
 input,
 select {
   border: 1px solid #cbd5df;
@@ -309,6 +336,199 @@ select {
   border: 1px solid #e0e7ee;
   border-radius: 9px;
   padding: 16px;
+}
+
+.enriched-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.enriched-grid article,
+.topic-card {
+  border: 1px solid #e0e7ee;
+  border-radius: 11px;
+  padding: 16px;
+  background: #fff;
+  color: #17334f;
+  text-align: left;
+}
+
+.enriched-grid article {
+  cursor: pointer;
+}
+
+.enriched-grid article.selected,
+.topic-card.selected {
+  border-color: #08717a;
+  background: #effaf8;
+}
+
+.article-top,
+.topic-card > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.enriched-grid h3,
+.topic-card strong {
+  color: #172b45;
+  font-size: 16px;
+  margin: 10px 0;
+}
+
+.enriched-grid p,
+.topic-card p,
+.body-preview {
+  color: #526175;
+  line-height: 1.5;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.chips span,
+.entity-groups span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #eef5f7;
+  color: #315064;
+  font-size: 11px;
+}
+
+.risk-pill {
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.risk-low {
+  background: #e8f6ef;
+  color: #0f6b42;
+}
+
+.risk-medium {
+  background: #fff7d6;
+  color: #946200;
+}
+
+.risk-high {
+  background: #ffecd6;
+  color: #b45309;
+}
+
+.risk-critical {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.detail-panel {
+  max-height: calc(100vh - 230px);
+}
+
+.risk-hero {
+  border-radius: 12px;
+  padding: 17px;
+  margin-bottom: 16px;
+}
+
+.risk-hero strong {
+  font-size: 40px;
+  display: block;
+}
+
+.risk-hero span {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+
+.risk-hero small {
+  display: block;
+  margin-top: 9px;
+  line-height: 1.5;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin: 0 0 18px;
+}
+
+.meta-grid div {
+  background: #f6f9fb;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.meta-grid dt {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.meta-grid dd {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.entity-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.entity-groups div {
+  border: 1px solid #e0e7ee;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.entity-groups strong {
+  display: block;
+  margin-bottom: 8px;
+  text-transform: capitalize;
+}
+
+.entity-groups span {
+  display: inline-block;
+  margin: 0 5px 5px 0;
+}
+
+.fetch-list {
+  background: #f6f9fb;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0 18px;
+}
+
+.fetch-list div {
+  margin-top: 8px;
+}
+
+.topic-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: #f3f8fa;
+}
+
+.small-strong {
+  font-size: 13px !important;
 }
 
 .documents h3 {
@@ -349,7 +569,9 @@ select {
 }
 
 @media (max-width: 1100px) {
-  .run-layout {
+  .run-layout,
+  .two-column,
+  .workspace {
     grid-template-columns: 1fr;
   }
 
@@ -364,7 +586,9 @@ select {
 
 @media (max-width: 800px) {
   .cards,
-  .documents {
+  .documents,
+  .enriched-grid,
+  .meta-grid {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -372,7 +596,9 @@ select {
 @media (max-width: 580px) {
   .cards,
   .documents,
-  .summary-strip {
+  .summary-strip,
+  .enriched-grid,
+  .meta-grid {
     grid-template-columns: 1fr;
   }
 
