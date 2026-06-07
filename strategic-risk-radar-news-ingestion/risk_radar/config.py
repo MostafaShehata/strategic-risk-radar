@@ -28,5 +28,7 @@ def load_settings(path: str | Path) -> Settings:
         resolved = dict(source)
         if env_name := resolved.get("appname_env"):
             resolved["appname"] = os.getenv(env_name, "")
+        if env_name := resolved.get("api_key_env"):
+            resolved["api_key"] = os.getenv(env_name, resolved.get("api_key", ""))
         sources.append(resolved)
     return Settings(keywords, tuple(sources), data)

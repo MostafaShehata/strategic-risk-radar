@@ -15,7 +15,7 @@ The repository contains four independently buildable projects:
 ```mermaid
 flowchart LR
     G["GDELT API<br/>5.2s request interval"] --> P["News ingestion worker"]
-    R["ReliefWeb API"] --> P
+    R["Guardian Content API"] --> P
     U["UN News RSS"] --> P
     D["GDACS RSS"] --> P
     P -->|"raw documents + observations + metrics"| DB["PostgreSQL"]
@@ -41,8 +41,9 @@ audit evidence, failure recovery, and measurable filtering results.
 
 ## Deploy With Docker Desktop
 
-Copy `.env.example` to `.env` and set a strong database password. ReliefWeb is
-free but requires an approved app name.
+Copy `.env.example` to `.env` and set a strong database password. Guardian can
+run with the public `test` key for early PoC work; set `GUARDIAN_API_KEY` to a
+free developer key for sustained use.
 
 ```powershell
 Copy-Item .env.example .env
@@ -81,7 +82,8 @@ lookback period, currently defaulting to `24` hours for source testing. Failed s
 the latest successful window, so they can be retried.
 
 Only English news is persisted. GDELT requests explicitly select English
-sources, and the selected RSS feeds are English feeds.
+sources, Guardian requests use English language filtering, and the selected RSS
+feeds are English feeds.
 
 ## Project Scripts
 

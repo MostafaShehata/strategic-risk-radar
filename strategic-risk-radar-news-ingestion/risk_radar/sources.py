@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import re
 import time
 from collections.abc import Iterable
 from typing import Any
@@ -75,34 +76,36 @@ class GdeltSource(Source):
             yield KeywordResult(keyword.name, 1, len(articles), items)
 
 
-class ReliefWebSource(Source):
+class GuardianSource(Source):
     def fetch(self, keywords: tuple[KeywordSpec, ...], window: TimeWindow) -> Iterable[KeywordResult]:
-        if not self.config.get("appname"):
-            raise SourceSkipped("RELIEFWEB_APPNAME is not configured")
+        api_key = self.config.get("api_key")
+        if not api_key:
+            raise SourceSkipped("GUARDIAN_API_KEY is not configured")
         for keyword in keywords:
-            response = self.request("POST", self.config["url"],
-                params={"appname": self.config["appname"]},
-                json={"limit": self.config.get("max_records", 50),
-                      "query": {"value": keyword.gdelt_query},
-                      "filter": {"field": "date.created",
-                                 "value": {"from": window.start.isoformat(),
-                                           "to": window.end.isoformat()}},
-                      "sort": ["date.created:desc"],
-                      "fields": {"include": ["title", "url", "body", "date.created"]}})
-            records = response.json().get("data", [])
+            response = self.request("GET", self.config["url"], params={
+                "api-key": api_key,
+                "q": keyword.gdelt_query,
+                "from-date": window.start.date().isoformat(),
+                "to-date": window.end.date().isoformat(),
+                "order-by": "newest",
+                "page-size": self.config.get("max_records", 50),
+                "show-fields": "headline,trailText,bodyText",
+                "lang": "en",
+            })
+            results = response.json().get("response", {}).get("results", [])
             items = []
-            for record in records:
-                fields = record.get("fields", {})
-                title = fields.get("title", "")
-                body = fields.get("body", "")
-                if not title.isascii() or not body.isascii():
+            for article in results:
+                fields = article.get("fields", {})
+                title = strip_html(fields.get("headline") or article.get("webTitle", ""))
+                summary = strip_html(fields.get("trailText") or fields.get("bodyText", ""))
+                if not title.isascii() or not summary.isascii():
                     continue
                 items.append(RawItem(
-                    self.config["id"], "api", str(record.get("id")),
-                    fields.get("url", ""), title, body,
-                    parse_datetime(fields.get("date", {}).get("created")), keyword.name, record,
+                    self.config["id"], "api", article.get("id", stable_id(article.get("webUrl", ""), title)),
+                    article.get("webUrl", ""), title, summary,
+                    parse_datetime(article.get("webPublicationDate")), keyword.name, article,
                 ))
-            yield KeywordResult(keyword.name, 1, len(records), tuple(items))
+            yield KeywordResult(keyword.name, 1, len(results), tuple(items))
 
 
 class RssSource(Source):
@@ -132,7 +135,15 @@ class RssSource(Source):
             )
 
 
-SOURCE_TYPES = {"gdelt": GdeltSource, "reliefweb": ReliefWebSource, "rss": RssSource}
+def strip_html(value: str) -> str:
+    return re.sub(r"<[^>]+>", "", value or "").strip()
+
+
+SOURCE_TYPES = {
+    "gdelt": GdeltSource,
+    "guardian": GuardianSource,
+    "rss": RssSource,
+}
 
 
 def build_source(config: dict[str, Any], client: httpx.Client) -> Source:

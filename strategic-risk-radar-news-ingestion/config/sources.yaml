@@ -39,11 +39,12 @@ sources:
     minimum_request_interval_seconds: 5.2
     retry_attempts: 3
 
-  - id: reliefweb
-    type: reliefweb
+  - id: guardian
+    type: guardian
     enabled: true
-    url: https://api.reliefweb.int/v2/reports
-    appname_env: RELIEFWEB_APPNAME
+    url: https://content.guardianapis.com/search
+    api_key_env: GUARDIAN_API_KEY
+    api_key: test
     max_records: 50
     retry_attempts: 3
 

@@ -32,7 +32,7 @@ services:
     image: strategic-risk-radar-news-ingestion:local
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@db:5432/${POSTGRES_DB:-risk_radar}
-      RELIEFWEB_APPNAME: ${RELIEFWEB_APPNAME:-}
+      GUARDIAN_API_KEY: ${GUARDIAN_API_KEY:-test}
       INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-1440}
       INGESTION_MAX_LOOKBACK_HOURS: ${INGESTION_MAX_LOOKBACK_HOURS:-24}
     depends_on:

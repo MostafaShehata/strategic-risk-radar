@@ -14,7 +14,8 @@ This trace follows one invocation of the ingestion container.
 
 1. `run()` calls `load_settings()` in `risk_radar/config.py`.
 2. YAML keywords and enabled sources are loaded.
-3. `RELIEFWEB_APPNAME` is resolved from the container environment.
+3. `GUARDIAN_API_KEY` is resolved from the container environment, falling back
+   to Guardian's public `test` key for PoC development.
 4. The unchanged YAML structure is retained as the run's configuration
    snapshot for auditing.
 
@@ -32,7 +33,7 @@ For every configured source:
 2. The start time is clamped to no earlier than the configured maximum
    lookback, currently defaulting to 24 hours before now for source testing.
 3. `Store.begin_source()` saves the requested start/end times.
-4. `build_source()` selects the GDELT, ReliefWeb, or RSS adapter.
+4. `build_source()` selects the GDELT, Guardian, or RSS adapter.
 5. The adapter returns one `KeywordResult` per configured keyword.
 6. Every `KeywordResult` records request count, retrieved count, and matching
    raw items.

@@ -36,7 +36,7 @@ Import `postman/GDELT-English-News.postman_collection.json` into Postman.
 
 - Send `Single Configurable Keyword` to test one keyword. Change the
   `keyword`, `lookbackHours`, or `maxrecords` collection variables as needed.
-- Run the `Project Keyword Groups - Run With 6000 ms Delay` folder to test all
+- Run the `Project Keyword Groups - Run With 60000 ms Delay` folder to test all
   five configured query groups.
 - In the Postman Collection Runner, set the request delay to at least `60000`
   milliseconds if you want to mirror the application retry behavior after
@@ -58,28 +58,21 @@ produce no entries. If entries are retrieved but matched count is `0`, the feed
 was available but none of the high-signal phrases appeared in the title or
 summary.
 
-## Free Humanitarian API Access
+## Guardian API Access
 
-The current humanitarian API adapter uses ReliefWeb. ReliefWeb is free, but
-its API requires a pre-approved `appname` parameter.
+The second API source is Guardian Open Platform. It replaces ReliefWeb to avoid
+approval delays during the PoC.
 
-1. Open the ReliefWeb API documentation and request an app name.
-2. Use an app name that combines the organization, purpose, and random
-   characters, for example `ICP-strategic-risk-radar-a7f3`.
-3. After approval, set `RELIEFWEB_APPNAME` in `.env`.
-4. Restart the ingestion container with `docker compose up -d --force-recreate
-   news-ingestion`.
+For quick development, the source uses Guardian's public `test` key by default.
+For sustained use, register for a free developer key at
+`https://open-platform.theguardian.com/access`, then set:
 
-UNHCR Operational Data Portal also provides API registration for ODP access.
-From your side, open the UNHCR ODP API registration page and submit:
+```env
+GUARDIAN_API_KEY=your-guardian-developer-key
+```
 
-1. Focal point name.
-2. Official email.
-3. Organization.
-4. Project name, for example `Strategic Risk Radar PoC`.
-5. Company or authority URL, if available.
+Restart the ingestion container after changing the key:
 
-For this PoC, keep ReliefWeb as the first humanitarian API because it is
-already integrated and designed for continuously updated humanitarian reports.
-Add UNHCR ODP as a later source when you specifically need UNHCR operational
-population, situation, or displacement datasets.
+```powershell
+docker compose up -d --force-recreate news-ingestion
+```
