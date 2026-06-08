@@ -19,6 +19,25 @@ class EnrichmentRepository:
                 (model_name,),
             ).fetchone()[0]
 
+    def recover_abandoned_work(self, message: str) -> tuple[int, int]:
+        with psycopg.connect(self.database_url) as connection:
+            run_rows = connection.execute(
+                """UPDATE enrichment_runs
+                   SET completed_at=now(), status='failed', error_message=%s
+                   WHERE status='running'
+                   RETURNING id""",
+                (message,),
+            ).fetchall()
+            claim_rows = connection.execute(
+                """UPDATE raw_news_items
+                   SET processing_status='pending',
+                       enrichment_run_id=NULL,
+                       enrichment_claimed_at=NULL
+                   WHERE processing_status='enriching'
+                   RETURNING id""",
+            ).fetchall()
+        return len(run_rows), len(claim_rows)
+
     def finish_run(self, run_id: UUID, processed: int, success: int, failed: int, error: str | None = None) -> None:
         status = "completed" if not error else "completed_with_errors"
         with psycopg.connect(self.database_url) as connection:

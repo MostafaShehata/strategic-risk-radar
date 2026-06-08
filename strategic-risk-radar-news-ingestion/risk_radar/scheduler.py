@@ -1,13 +1,15 @@
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from uuid import UUID
 
 from .config import Settings, load_settings
 from .job_runner import RuntimeSettings, SourceJobRunner
+from .repository import IngestionRepository
 
 
 def run_once(settings: Settings, database_url: str, runtime: RuntimeSettings) -> list[UUID]:
+    recover_abandoned_source_runs(database_url)
     with ThreadPoolExecutor(max_workers=max(1, len(settings.sources))) as executor:
         futures = [
             executor.submit(SourceJobRunner(settings, database_url, runtime).run, source_config)
@@ -22,7 +24,16 @@ def run_scheduler(config_path: str, database_url: str, runtime: RuntimeSettings)
         raise ValueError("No enabled ingestion sources are configured")
 
     print(f"scheduler starting {len(settings.sources)} independent source runners", flush=True)
+    recover_abandoned_source_runs(database_url)
     SourceScheduler(settings, database_url, runtime).run()
+
+
+def recover_abandoned_source_runs(database_url: str) -> None:
+    recovered = IngestionRepository(database_url).recover_running_source_runs(
+        "Recovered after ingestion service startup; previous process stopped before closing the source run."
+    )
+    if recovered:
+        print(f"recovered abandoned source runs count={recovered}", flush=True)
 
 
 class SourceScheduler:

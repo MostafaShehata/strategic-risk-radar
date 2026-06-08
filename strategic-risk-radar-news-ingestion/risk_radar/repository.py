@@ -13,6 +13,32 @@ class IngestionRepository:
     def __init__(self, database_url: str):
         self.database_url = database_url
 
+    def recover_running_source_runs(self, message: str) -> int:
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute(
+                """UPDATE source_runs
+                   SET completed_at=now(), status='failed', error_message=%s
+                   WHERE status='running'
+                   RETURNING run_id""",
+                (message,),
+            ).fetchall()
+            run_ids = [row[0] for row in rows]
+            for run_id in set(run_ids):
+                connection.execute(
+                    """UPDATE ingestion_runs r SET completed_at=now(),
+                       status=CASE WHEN x.errors=0 THEN 'completed' ELSE 'completed_with_errors' END,
+                       total_retrieved=x.retrieved,total_matched=x.matched,total_inserted=x.inserted,
+                       total_duplicates=x.duplicates,error_count=x.errors
+                       FROM (SELECT run_id,coalesce(sum(retrieved_count),0) retrieved,
+                             coalesce(sum(matched_count),0) matched,coalesce(sum(inserted_count),0) inserted,
+                             coalesce(sum(duplicate_count),0) duplicates,
+                             count(*) FILTER (WHERE status IN ('error','failed')) errors
+                             FROM source_runs WHERE run_id=%s GROUP BY run_id) x
+                       WHERE r.id=x.run_id""",
+                    (run_id,),
+                )
+            return len(rows)
+
     def next_window(
         self,
         source_id: str,

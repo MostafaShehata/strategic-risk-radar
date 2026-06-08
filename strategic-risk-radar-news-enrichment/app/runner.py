@@ -12,6 +12,14 @@ from .repository import EnrichmentRepository
 class EnrichmentRunner:
     def __init__(self) -> None:
         self.repository = EnrichmentRepository(settings.database_url)
+        recovered_runs, recovered_claims = self.repository.recover_abandoned_work(
+            "Recovered after enrichment service startup; previous process stopped before closing the run."
+        )
+        if recovered_runs or recovered_claims:
+            print(
+                f"recovered abandoned enrichment work runs={recovered_runs} claims={recovered_claims}",
+                flush=True,
+            )
         self.graph = build_graph(
             EnrichmentWorkflowAgents(
                 repository=self.repository,

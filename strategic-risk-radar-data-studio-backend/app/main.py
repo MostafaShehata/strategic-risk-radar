@@ -284,6 +284,20 @@ def rag_status() -> dict[str, Any]:
         }
 
 
+@app.get("/api/command-center")
+def command_center() -> dict[str, Any]:
+    return {
+        "overview": {**overview(), **enrichment_overview()},
+        "sources": ingestion_summary(),
+        "topics": topics(limit=8),
+        "kpis": kpi_dashboard()[:10],
+        "latest_items": enriched_items(min_score=0, limit=12),
+        "ingestion_runs": runs(limit=8),
+        "enrichment_runs": enrichment_runs(limit=8),
+        "rag": rag_status(),
+    }
+
+
 @app.get("/api/summary/ingestion")
 def ingestion_summary() -> list[dict[str, Any]]:
     return query(
