@@ -152,6 +152,30 @@ services:
     depends_on:
       - data-studio-backend
 
+  command-center-backend:
+    container_name: strategic-risk-radar-command-center-backend
+    build: ./strategic-risk-radar-command-center-backend
+    image: strategic-risk-radar-command-center-backend:local
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-risk_radar}:${POSTGRES_PASSWORD:-risk_radar}@postgres-db:5432/${POSTGRES_DB:-risk_radar}
+      RAG_API_URL: http://rag-api:8100
+    ports:
+      - "127.0.0.1:${COMMAND_CENTER_API_PORT:-8200}:8200"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      rag-api:
+        condition: service_started
+
+  command-center-frontend:
+    container_name: strategic-risk-radar-command-center-frontend
+    build: ./strategic-risk-radar-command-center-frontend
+    image: strategic-risk-radar-command-center-frontend:local
+    ports:
+      - "127.0.0.1:${COMMAND_CENTER_PORT:-3100}:80"
+    depends_on:
+      - command-center-backend
+
 volumes:
   risk-radar-ollama:
   risk-radar-qdrant:
