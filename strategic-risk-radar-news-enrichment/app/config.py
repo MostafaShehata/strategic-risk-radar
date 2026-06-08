@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_base_url: str = "http://ollama-model:11434"
     model_name: str = "deepseek-r1:1.5b"
     enrichment_interval_seconds: int = 300
-    enrichment_batch_size: int = 2
+    enrichment_batch_size: int = 200
     crawler_min_body_chars: int = 400
     firecrawler_timeout_seconds: int = 5
     topic_match_threshold: float = 0.90
